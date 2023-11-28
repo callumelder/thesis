@@ -10,8 +10,6 @@ user_name = username.split('@')[0].replace('.','_')
 # DBTITLE 1,Set document path
 config['kb_documents_path'] = "/Volumes/prototype/{}/{}_volume".format(user_name,user_name)
 config['vector_store_path'] = '/dbfs/tmp/{}/vector_store'.format(user_name)
-print(config['kb_documents_path'])
-print(config['vector_store_path'])
 
 # COMMAND ----------
 

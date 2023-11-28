@@ -3,6 +3,7 @@ if 'config' not in locals():
   config = {}
 
 username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
+# dennis.mellican@armhub.com.au -> dennis_mellican
 user_name = username.split('@')[0].replace('.','_')
 
 # COMMAND ----------

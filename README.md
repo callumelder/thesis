@@ -10,6 +10,7 @@ Although this is not completely automated, there are a few manual steps required
 for example: dennis_mellican.
 
 1. Clone this repo in Databricks: Repos -> Workspace. Use a unique name, such as your username.
+    If you need to create a Git Personal Token, go to: https://github.com/settings/tokens.
 1. Create or rename your volume to follow this naming convention: /Catalog/Volume/{user_name}/{user_name}_volume.
 1. Upload documents to the aforementioned volume.
 1. Attach the notebooks to a cluster, such as your cluster name (start it now).

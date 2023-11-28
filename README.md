@@ -7,7 +7,7 @@ for the Teams Armbot to call.
 
 Although this is not completely automated, there are a few manual steps required to get started. Note, the
 {user_name} reference in these instructions denotes your ARM Hub AD username (without the @armhub.com.au),
-for example: dennis_mellican.
+for example: dennis_mellican. hello
 
 1. Clone this repo in Databricks: Repos -> Workspace -> Add Folder -> Add Repo. Use a unique name, such as your username.
     If you need to create a Git Personal Token, go to: https://github.com/settings/tokens.

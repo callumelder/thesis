@@ -51,7 +51,7 @@ config['temperature'] = 0.15
 # COMMAND ----------
 
 # DBTITLE 1,Set evaluation config
-config["eval_dataset_path"]= "/Workspace/Users/{}/diy-llm-qa-bot/data/eval_data.tsv".format(username)
+config["eval_dataset_path"]= "./data/eval_data.tsv"
 
 # COMMAND ----------
 

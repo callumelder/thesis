@@ -20,8 +20,15 @@
 # COMMAND ----------
 
 # DBTITLE 1,Install Required Libraries
-# MAGIC %pip install PyPDF2 langchain==0.0.166 tiktoken==0.4.0 openai==0.27.6 faiss-cpu==1.7.4 typing-inspect==0.8.0 typing_extensions==4.5.0 pycryptodome==3.19.0
+# MAGIC %pip install PyPDF2 langchain==0.0.166 tiktoken==0.4.0 openai==0.27.6 faiss-cpu==1.7.4 typing-inspect==0.8.0 typing_extensions==4.5.0 pycryptodome==3.19.0 reportlab==4.0.7 pypandoc==1.12
 # MAGIC
+
+# COMMAND ----------
+
+# MAGIC %sh
+# MAGIC apt-get update
+# MAGIC apt-get install -y pandoc
+# MAGIC apt-get install -y texlive
 
 # COMMAND ----------
 
@@ -69,6 +76,97 @@ from langchain.vectorstores.faiss import FAISS
 # MAGIC %md The process of converting a document to an index involves us translating it to a fixed-size embedding.  An embedding is a set of numerical values, kind of like a coordinate, that summarizes the content in a unit of text. While large embeddings are capable of capturing quite a bit of detail about a document, the larger the document submitted to it, the more the embedding generalizes the content.  It's kind of like asking someone to summarize a paragraph, a chapter or an entire book into a fixed number of dimensions.  The greater the scope, the more the summary must eliminate detail and focus on the higher-level concepts in the text.
 # MAGIC
 # MAGIC A common strategy for dealing with this when generating embeddings is to divide the text into chunks.  These chunks need to be large enough to capture meaningful detail but not so large that key elements get washed out in the generalization.  Its more of an art than a science to determine an appropriate chunk size, but here we'll use a very small chunk size to illustrate what's happening in this step:
+
+# COMMAND ----------
+
+import os
+import pypandoc
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+
+
+def wrap_text(c, text, max_width):
+    lines = []
+    words = text.split()
+    current_line = words[0]
+
+    for word in words[1:]:
+        if c.stringWidth(current_line + " " + word, "Helvetica", 12) < max_width:
+            current_line += " " + word
+        else:
+            lines.append(current_line)
+            current_line = word
+
+    lines.append(current_line)
+    return lines
+
+def convert_to_pdf(input_file, output_folder):
+    try:
+        # Check if the file is a Word document or a text file
+        if input_file.lower().endswith((".docx", ".doc")):
+            # Generate the output PDF filename
+            output_pdf_name = os.path.splitext(os.path.basename(input_file))[0] + ".pdf"
+            output_pdf_path = os.path.join(output_folder, output_pdf_name)
+
+            # Convert the document to PDF using pandoc
+            pypandoc.convert_file(input_file, 'pdf', outputfile=output_pdf_path)
+
+            print(f"Conversion successful. PDF saved to {output_pdf_path}")
+
+        # Check if the file is a text file
+        elif input_file.lower().endswith(".txt"):
+            with open(input_file, 'r') as file:
+                input_text = file.read()
+
+            # Generate the output PDF filename
+            output_pdf_name = os.path.splitext(os.path.basename(input_file))[0] + ".pdf"
+            output_pdf_path = os.path.join(output_folder, output_pdf_name)
+
+            # Create a new PDF document using reportlab
+            c = canvas.Canvas(output_pdf_path, pagesize=letter)
+            c.setFont("Helvetica", 12)
+
+            # Set starting y-coordinate for the text
+            y = 750
+
+            # Define available width for text
+            available_width = 400
+
+            # Write each line to the PDF with manual text wrapping
+            for line in wrap_text(c, input_text, available_width):
+                c.drawString(100, y, line)
+                y -= 12  # Move to the next line
+
+            # Save the PDF
+            c.save()
+
+            print(f"Conversion successful. PDF saved to {output_pdf_path}")
+
+    except Exception as e:
+        print(f"Error processing '{input_file}': {e}")
+
+def convert_folder_to_pdf(input_folder, output_folder):
+    try:
+        for root, dirs, files in os.walk(input_folder):
+            for filename in files:
+                input_file_path = os.path.join(root, filename)
+                convert_to_pdf(input_file_path, output_folder)
+
+    except Exception as e:
+        print(f"Error processing folder '{input_folder}': {e}")
+
+# Replace 'input_folder_path' and 'output_folder_path' with the appropriate paths
+input_folder_path = '/Volumes/prototype/callum/research_volume'
+output_folder_path = '/Volumes/prototype/callum/research_volume'
+
+try:
+    convert_folder_to_pdf(input_folder_path, output_folder_path)
+
+except FileNotFoundError:
+    print(f"Error: Folder '{input_folder_path}' not found.")
+except Exception as e:
+    print(f"Error: {e}")
+
 
 # COMMAND ----------
 

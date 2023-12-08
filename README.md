@@ -14,6 +14,7 @@ for example: dennis_mellican. hello
 1. Create or rename your volume to follow this naming convention: /Catalog/Volume/{user_name}/{user_name}_volume.
 1. Upload documents to the aforementioned volume.
 1. Attach the notebooks to a cluster, such as your cluster name (start it now).
+1. Update the notebook-config.py if you are testing on your volume only. Look for references to the kb_documents_path.
 1. Select the RUNALL notebook and click the "Run all" button.
 1. Your endpoint will be something like (replace <user_name>):
     ```https://adb-4738734208814752.12.azuredatabricks.net/serving-endpoints/llm-{user_name}-armhub-endpoint/invocations```

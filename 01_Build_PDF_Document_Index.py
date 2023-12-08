@@ -155,15 +155,11 @@ def convert_folder_to_pdf(input_folder, output_folder):
     except Exception as e:
         print(f"Error processing folder '{input_folder}': {e}")
 
-# Replace 'input_folder_path' and 'output_folder_path' with the appropriate paths
-input_folder_path = '/Volumes/prototype/callum/research_volume'
-output_folder_path = '/Volumes/prototype/callum/research_volume'
-
 try:
-    convert_folder_to_pdf(input_folder_path, output_folder_path)
+    convert_folder_to_pdf(config['kb_documents_path'], config['kb_documents_path'])
 
 except FileNotFoundError:
-    print(f"Error: Folder '{input_folder_path}' not found.")
+    print(f"Error: Folder '{config['kb_documents_path']}' not found.")
 except Exception as e:
     print(f"Error: {e}")
 
@@ -186,11 +182,8 @@ def extract_text_from_pdf(file_path):
                 text += page.extract_text()
     return text
 
-# File path of the PDF
-pdf_file_path = '/Volumes/prototype/{}/{}_volume'.format(user_name,user_name)
-
 # Extract text from the specified PDF file
-extracted_text = extract_text_from_pdf(pdf_file_path)
+extracted_text = extract_text_from_pdf(config['kb_documents_path']})
 
 # Create a DataFrame with the extracted text
 raw = spark.createDataFrame([(extracted_text,)], ["text"],['source'])

@@ -3,13 +3,16 @@ if 'config' not in locals():
   config = {}
 
 username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
-# dennis.mellican@armhub.com.au -> dennis_mellican
 user_name = username.split('@')[0].replace('.','_')
 
 # COMMAND ----------
 
 # DBTITLE 1,Set document path
-config['kb_documents_path'] = "/Volumes/prototype/{}/{}_volume".format(user_name,user_name)
+
+# Switch out the kb_documents_path to test on your volume vs the armbot volume:
+#config['kb_documents_path'] = "/Volumes/prototype/{}/{}_volume".format(user_name,user_name)
+config['kb_documents_path'] = "/Volumes/prototype/armbot/armbot-docs"
+
 config['vector_store_path'] = '/dbfs/tmp/{}/vector_store'.format(user_name)
 
 # COMMAND ----------

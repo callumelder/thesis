@@ -183,13 +183,13 @@ def extract_text_from_pdf(file_path):
     return text
 
 # Extract text from the specified PDF file
-extracted_text = extract_text_from_pdf(config['kb_documents_path']})
+extracted_text = extract_text_from_pdf(config['kb_documents_path'])
 
 # Create a DataFrame with the extracted text
 raw = spark.createDataFrame([(extracted_text,)], ["text"],['source'])
 
 # Display the DataFrame
-display(raw)
+raw.show(10, False)
 
 
 # COMMAND ----------

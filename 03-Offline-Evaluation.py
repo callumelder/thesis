@@ -31,12 +31,16 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install databricks-sdk==0.12.0 mlflow==2.10.1 textstat==0.7.3 tiktoken==0.5.1 evaluate==0.4.1 langchain==0.1.5 databricks-vectorsearch==0.22 transformers==4.30.2 torch==2.0.1 cloudpickle==2.2.1 pydantic==2.5.2
+# MAGIC %pip install databricks-sdk==0.12.0 databricks-genai-inference==0.1.1 mlflow==2.9.0 textstat==0.7.3 tiktoken==0.5.1 evaluate==0.4.1 langchain==0.1.16 databricks-vectorsearch==0.22 transformers==4.30.2 torch==2.1.2 cloudpickle==2.2.1 pydantic==2.5.2 --upgrade sqlalchemy
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# MAGIC %run ../_resources/00-init-advanced $reset_all_data=false
+import os
+
+print(os.getcwd())
+
+%run ./_resources/00-init-advanced $reset_all_data=false
 
 # COMMAND ----------
 
@@ -106,19 +110,33 @@ answer_test['choices'][0]['message']['content']
 
 # COMMAND ----------
 
-volume_folder =  f"/Volumes/{catalog}/{db}/volume_databricks_documentation/evaluation_dataset"
-#Load the eval dataset from the repository to our volume
-upload_dataset_to_volume(volume_folder)
+volume_folder =  f"/Volumes/main/rag_chatbot_callum_elder/armhub_datasets"
+dataset_path = volume_folder + '/question_answer_source.csv'
+
+# COMMAND ----------
+
+import pandas as pd
+
+# Read the CSV file using pandas
+df = pd.read_csv(dataset_path)
 
 # COMMAND ----------
 
 # DBTITLE 1,Preparing our evaluation dataset
-spark.sql(f'''
-CREATE OR REPLACE TABLE evaluation_dataset AS
-  SELECT q.id, q.question, a.answer FROM parquet.`{volume_folder}/training_dataset_question.parquet` AS q
-    LEFT JOIN parquet.`{volume_folder}/training_dataset_answer.parquet` AS a
-      ON q.id = a.question_id ;''')
+# Convert the pandas DataFrame to a Spark DataFrame
+spark_df = spark.createDataFrame(df)
 
+# Create a temporary view from the Spark DataFrame
+spark_df.createOrReplaceTempView("question_answer_csv")
+
+# Create or replace the evaluation_dataset table
+spark.sql('''
+CREATE OR REPLACE TABLE evaluation_dataset AS
+  SELECT question, answer 
+  FROM question_answer_csv
+''')
+
+# Display the evaluation_dataset table
 display(spark.table('evaluation_dataset'))
 
 # COMMAND ----------
@@ -131,14 +149,12 @@ display(spark.table('evaluation_dataset'))
 # COMMAND ----------
 
 # MAGIC %pip install mlflow[databricks]
-# MAGIC %pip install mlflow-skinny[databricks]
 
 # COMMAND ----------
 
 import mlflow
-import os
 os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get("dbdemos-callum", "rag_sp_token")
-model_name = f"{catalog}.{db}.gpt_advanced_chatbot_model"
+model_name = f"{catalog}.{db}.gpt_advanced_chatbot_model_armhub"
 model_version_to_evaluate = get_latest_model_version(model_name)
 mlflow.set_registry_uri("databricks-uc")
 rag_model = mlflow.langchain.load_model(f"models:/{model_name}/{model_version_to_evaluate}")
@@ -219,7 +235,7 @@ professionalism = make_genai_metric(
         "business or academic settings. "
     ),
     model=f"endpoints:/{endpoint_name}",
-    parameters={"temperature": 0.0},
+    parameters={"temperature": 0.0, "max_tokens": 4096},
     aggregations=["mean", "variance"],
     examples=[professionalism_example],
     greater_is_better=True
@@ -281,6 +297,178 @@ px.bar(df_genai_metrics['answer_correctness/v1/score'].value_counts(), title='An
 df_genai_metrics['toxicity'] = df_genai_metrics['toxicity/v1/score'] * 100
 fig = px.scatter(df_genai_metrics, x='toxicity', y='answer_correctness/v1/score', title='Toxicity vs Correctness', size=[10]*len(df_genai_metrics))
 fig.update_xaxes(tickformat=".2f")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #Retrieval System Evaluation
+
+# COMMAND ----------
+
+# Prepare dataframe `data` with the required format
+data = pd.DataFrame({})
+data["question"] = df["question"].copy(deep=True)
+data["source"] = df["source"].apply(lambda x: [x])
+display(data)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #Set up embedding model endpoints
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ##Databricks Embedding Model
+
+# COMMAND ----------
+
+from langchain_community.embeddings import DatabricksEmbeddings
+
+databricks_embedding_model = DatabricksEmbeddings(endpoint="databricks-bge-large-en")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ##OpenAI Embedding Models
+
+# COMMAND ----------
+
+from langchain_community.chat_models import ChatDatabricks
+from langchain_core.messages import HumanMessage
+from mlflow.deployments import get_deploy_client
+
+# create endpoint for gpt4 model
+
+client = get_deploy_client("databricks")
+
+name = "text-embedding-ada-002"  # rename this if my-chat already exists
+try:
+  client.create_endpoint(
+    name=name,
+    config={
+      "served_entities": [
+        {
+          "name": name,
+          "external_model": {
+            "name": name,
+            "provider": "openai",
+            "task": "llm/v1/embeddings",
+              "openai_config": {
+            "openai_api_key": "{{secrets/my_openai_secret_scope/openai_api_key}}"
+            }
+          },
+        }
+      ],
+    },
+  )
+except Exception as e:
+  if 'RESOURCE_ALREADY_EXISTS' in str(e):
+    print('Endpoint already exists')
+  else:
+    print(e)
+
+# COMMAND ----------
+
+from langchain_community.embeddings import DatabricksEmbeddings
+
+ada_embedding_model = DatabricksEmbeddings(endpoint="text-embedding-ada-002")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ##Cohere Embedding Model
+
+# COMMAND ----------
+
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ##Get Retriever
+
+# COMMAND ----------
+
+from databricks.vector_search.client import VectorSearchClient
+from langchain_community.vectorstores import DatabricksVectorSearch
+from langchain.chains import RetrievalQA
+import os
+
+os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get("dbdemos-callum", "rag_sp_token")
+
+index_name=f"prototype.rag_chatbot_zhuoyang_zhao.armhub_pdf_documentation_self_managed_vs_index"
+host = "https://" + spark.conf.get("spark.databricks.workspaceUrl")
+
+def get_retriever(embedding_model, persist_dir: str = None):
+    os.environ["DATABRICKS_HOST"] = host
+    #Get the vector search index
+    vsc = VectorSearchClient(workspace_url=host, personal_access_token=os.environ["DATABRICKS_TOKEN"])
+    vs_index = vsc.get_index(
+        endpoint_name=VECTOR_SEARCH_ENDPOINT_NAME,
+        index_name=index_name
+    )
+
+    # Create the retriever
+    vectorstore = DatabricksVectorSearch(
+        vs_index, text_column="content", embedding=embedding_model, columns=["basename"]
+    )
+    return vectorstore.as_retriever(search_kwargs={'k': 4})
+
+retriever = get_retriever(ada_embedding_model)
+
+# COMMAND ----------
+
+# Test the retriever with a query
+retrieved_docs = retriever.get_relevant_documents(
+    "What is ARM Hub?"
+)
+len(retrieved_docs)
+
+# COMMAND ----------
+
+from typing import List
+
+# Define a function to return a list of retrieved doc ids
+def retrieve_doc_ids(question: str) -> List[str]:
+    docs = retriever.get_relevant_documents(question)
+    return [doc.metadata["basename"] + ".pdf" for doc in docs]
+
+data["retrieved_doc_ids"] = data["question"].apply(retrieve_doc_ids)
+print(data)
+
+# COMMAND ----------
+
+data.to_csv("databricks_retrieval_dataset.csv", index=False)
+
+# COMMAND ----------
+
+with mlflow.start_run() as run:
+    evaluate_results = mlflow.evaluate(
+        data=data,
+        targets="source",
+        predictions="retrieved_doc_ids",
+        evaluators="default",
+        extra_metrics=[
+            mlflow.metrics.precision_at_k(1),
+            mlflow.metrics.precision_at_k(2),
+            mlflow.metrics.precision_at_k(3),
+            mlflow.metrics.recall_at_k(1),
+            mlflow.metrics.recall_at_k(2),
+            mlflow.metrics.recall_at_k(3),
+            mlflow.metrics.ndcg_at_k(1),
+            mlflow.metrics.ndcg_at_k(2),
+            mlflow.metrics.ndcg_at_k(3),
+        ],
+    )
+
+# COMMAND ----------
+
+display(evaluate_results.tables["eval_results_table"])
+
+# COMMAND ----------
+
+evaluate_results.tables["eval_results_table"].to_csv("databricks_evaluate_results.csv", index=False)
 
 # COMMAND ----------
 

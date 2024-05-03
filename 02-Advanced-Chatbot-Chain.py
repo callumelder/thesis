@@ -27,8 +27,9 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install mlflow==2.10.1 lxml==4.9.3 langchain==0.1.5 databricks-vectorsearch==0.22 cloudpickle==2.2.1 databricks-sdk==0.18.0 cloudpickle==2.2.1 pydantic==2.5.2 langchain_community
+# MAGIC %pip install mlflow==2.10.1 lxml==4.9.3 langchain==0.1.5 databricks-vectorsearch==0.22 cloudpickle==2.2.1 databricks-sdk==0.18.0 cloudpickle==2.2.1 pydantic==2.5.2
 # MAGIC %pip install pip mlflow[databricks]==2.10.1
+# MAGIC %pip install sqlalchemy --upgrade
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -60,7 +61,7 @@ try:
     config={
       "served_entities": [
         {
-          "name": "my-chat-04",
+          "name": name,
           "external_model": {
             "name": "gpt-4",
             "provider": "openai",
@@ -95,14 +96,13 @@ prompt = PromptTemplate(
   input_variables = ["question"],
   template = "You are an assistant. Give a short answer to this question: {question}"
 )
-# chat_model = ChatDatabricks(endpoint="databricks-llama-2-70b-chat", max_tokens = 500)
 
 chain = (
   prompt
   | chat_model
   | StrOutputParser()
 )
-print(chain.invoke({"question": "What is Spark?"}))
+print(chain.invoke({"question": "How do I engage with ARM Hub?"}))
 
 # COMMAND ----------
 
@@ -112,7 +112,7 @@ print(chain.invoke({"question": "What is Spark?"}))
 # COMMAND ----------
 
 prompt_with_history_str = """
-Your are a Big Data chatbot. Please answer Big Data question only. If you don't know or not related to Big Data, don't answer.
+Your are a ARM Hub's chatbot. Please answer ARM Hub Related question only. If you don't know or not related to ARM Hub, don't answer.
 
 Here is a history between you and a human: {chat_history}
 
@@ -163,9 +163,9 @@ chain_with_history = (
 
 print(chain_with_history.invoke({
     "messages": [
-        {"role": "user", "content": "What is Apache Spark?"}, 
-        {"role": "assistant", "content": "Apache Spark is an open-source data processing engine that is widely used in big data analytics."}, 
-        {"role": "user", "content": "Does it support streaming?"}
+        {"role": "user", "content": "how do i engage with ARM Hub?"}, 
+        {"role": "assistant", "content": "To engage with ARM Hub, you can start by visiting their website and exploring the various resources and tools available. You can also sign up for their newsletter to stay up-to-date on the latest news and developments in the ARM ecosystem. Additionally, you can participate in online communities and forums related to ARM technology to connect with other developers and users.."}, 
+        {"role": "user", "content": "Where is ARM Hub?"}
     ]
 }))
 
@@ -180,17 +180,15 @@ print(chain_with_history.invoke({
 
 # COMMAND ----------
 
-# chat_model = ChatDatabricks(endpoint="databricks-llama-2-70b-chat", max_tokens = 200)
-
 is_question_about_databricks_str = """
-You are classifying documents to know if this question is related with Databricks in AWS, Azure and GCP, Workspaces, Databricks account and cloud infrastructure setup, Data Science, Data Engineering, Big Data, Datawarehousing, SQL, Python and Scala or something from a very different field. Also answer no if the last part is inappropriate. 
+You are classifying documents to know if this question is related with ARM Hub (Advanced Robotics for Manufacturing) which is a not-for-profit organization in Australia focused on accelerating the adoption of advanced manufacturing technologies, particularly for SMEs. Also answer no if the last part is inappropriate.
 
 Here are some examples:
 
-Question: Knowing this followup history: What is Databricks?, classify this question: Do you have more details?
+Question: Knowing this followup history: Where is ARM Hub?, classify this question: Do you have more details?
 Expected Response: Yes
 
-Question: Knowing this followup history: What is Databricks?, classify this question: Write me a song.
+Question: Knowing this followup history: What is ARM Hub?, classify this question: Write me a song.
 Expected Response: No
 
 Only answer with "yes" or "no". 
@@ -216,9 +214,9 @@ is_about_databricks_chain = (
 #Returns "Yes" as this is about Databricks: 
 print(is_about_databricks_chain.invoke({
     "messages": [
-        {"role": "user", "content": "What is Apache Spark?"}, 
-        {"role": "assistant", "content": "Apache Spark is an open-source data processing engine that is widely used in big data analytics."}, 
-        {"role": "user", "content": "Does it support streaming?"}
+        {"role": "user", "content": "What is ARM Hub?"}, 
+        {"role": "assistant", "content": "ARM Hub is an independent, not-for-profit organization that aims to accelerate the adoption of advanced manufacturing technologies in Australia. It serves as an aggregator of research and development, connecting private industry, research institutions, and government to help uplift, upskill, and transform Australian manufacturing with a particular focus on small and medium-sized enterprises (SMEs). ARM Hub facilitates the creation and adoption of advanced manufacturing technologies and processes by providing expertise from researchers, engineers, and roboticists in priority technical areas such as automation and robotics, data science, image processing and computer vision, human-robot interaction, and process design. They also build expert teams to address the specific needs of business transformations and apply Industry 4.0 technologies to meet industry challenges."}, 
+        {"role": "user", "content": "How do I engage it?"}
     ]
 }))
 
@@ -249,11 +247,11 @@ print(is_about_databricks_chain.invoke({
 
 # COMMAND ----------
 
-index_name=f"{catalog}.{db}.databricks_pdf_documentation_self_managed_vs_index"
+index_name=f"prototype.rag_chatbot_zhuoyang_zhao.armhub_pdf_documentation_self_managed_vs_index"
 host = "https://" + spark.conf.get("spark.databricks.workspaceUrl")
-
+ 
 #Let's make sure the secret is properly setup and can access our vector search index. Check the quick-start demo for more guidance
-test_demo_permissions(host, secret_scope="dbdemos", secret_key="rag_sp_token", vs_endpoint_name=VECTOR_SEARCH_ENDPOINT_NAME, index_name=index_name, embedding_endpoint_name="databricks-bge-large-en", managed_embeddings = False)
+test_demo_permissions(host, secret_scope="dbdemos-callum", secret_key="rag_sp_token", vs_endpoint_name=VECTOR_SEARCH_ENDPOINT_NAME, index_name=index_name, embedding_endpoint_name="databricks-bge-large-en", managed_embeddings = False)
 
 # COMMAND ----------
 
@@ -277,7 +275,7 @@ def get_retriever(persist_dir: str = None):
 
     # Create the retriever
     vectorstore = DatabricksVectorSearch(
-        vs_index, text_column="content", embedding=embedding_model, columns=["url"]
+        vs_index, text_column="content", embedding=embedding_model, columns=["basename"]
     )
     return vectorstore.as_retriever(search_kwargs={'k': 4})
 
@@ -288,7 +286,7 @@ retrieve_document_chain = (
     | RunnableLambda(extract_question)
     | retriever
 )
-print(retrieve_document_chain.invoke({"messages": [{"role": "user", "content": "What is Apache Spark?"}]}))
+print(retrieve_document_chain.invoke({"messages": [{"role": "user", "content": "Who is Cori Stewart?"}]}))
 
 # COMMAND ----------
 
@@ -331,16 +329,16 @@ generate_query_to_retrieve_context_chain = (
 #Let's try it
 output = generate_query_to_retrieve_context_chain.invoke({
     "messages": [
-        {"role": "user", "content": "What is Apache Spark?"}
+        {"role": "user", "content": "What is ARM Hub?"}
     ]
 })
 print(f"Test retriever query without history: {output}")
 
 output = generate_query_to_retrieve_context_chain.invoke({
     "messages": [
-        {"role": "user", "content": "What is Apache Spark?"}, 
-        {"role": "assistant", "content": "Apache Spark is an open-source data processing engine that is widely used in big data analytics."}, 
-        {"role": "user", "content": "Does it support streaming?"}
+        {"role": "user", "content": "What is ARM Hub?"}, 
+        {"role": "assistant", "content": "ARM Hub is an independent, not-for-profit organization that aims to accelerate the adoption of advanced manufacturing technologies in Australia. It serves as an aggregator of research and development, connecting private industry, research institutions, and government to help uplift, upskill, and transform Australian manufacturing with a particular focus on small and medium-sized enterprises (SMEs). ARM Hub facilitates the creation and adoption of advanced manufacturing technologies and processes by providing expertise from researchers, engineers, and roboticists in priority technical areas such as automation and robotics, data science, image processing and computer vision, human-robot interaction, and process design. They also build expert teams to address the specific needs of business transformations and apply Industry 4.0 technologies to meet industry challenges."}, 
+        {"role": "user", "content": "How do I engage it?"}
     ]
 })
 print(f"Test retriever question, summarized with history: {output}")
@@ -364,10 +362,12 @@ print(f"Test retriever question, summarized with history: {output}")
 # COMMAND ----------
 
 from langchain.schema.runnable import RunnableBranch, RunnableParallel, RunnablePassthrough
+from operator import itemgetter
 
+
+# Template to handle any questions, assuming all are relevant
 question_with_history_and_context_str = """
-You are a trustful assistant for Databricks users. You are answering python, coding, SQL, data engineering, spark, data science, AI, ML, Datawarehouse, platform, API or infrastructure, Cloud administration question related to Databricks. If you do not know the answer to a question, you truthfully say you do not know. Read the discussion to get the context of the previous conversation. In the chat discussion, you are referred to as "system". The user is referred to as "user".
-
+You are a chatbot answer the questions.
 Discussion: {chat_history}
 
 Here's some context which might or might not help you answer: {context}
@@ -378,94 +378,55 @@ Based on this history and context, answer this question: {question}
 """
 
 question_with_history_and_context_prompt = PromptTemplate(
-  input_variables= ["chat_history", "context", "question"],
-  template = question_with_history_and_context_str
+    input_variables=["chat_history", "context", "question"],
+    template=question_with_history_and_context_str
 )
 
 def format_context(docs):
-  return "\n\n".join([d.page_content for d in docs])
+    return "\n\n".join([d.page_content for d in docs])
 
 def extract_source_urls(docs):
-  return [d.metadata["url"] for d in docs]
+    return [d.metadata["basename"] for d in docs]
 
-relevant_question_chain = (
-  RunnablePassthrough() |
-  {
-    "relevant_docs": generate_query_to_retrieve_context_prompt | chat_model | StrOutputParser() | retriever,
-    "chat_history": itemgetter("chat_history"), 
-    "question": itemgetter("question")
-  }
-  |
-  {
-    "context": itemgetter("relevant_docs") | RunnableLambda(format_context),
-    "sources": itemgetter("relevant_docs") | RunnableLambda(extract_source_urls),
-    "chat_history": itemgetter("chat_history"), 
-    "question": itemgetter("question")
-  }
-  |
-  {
-    "prompt": question_with_history_and_context_prompt,
-    "sources": itemgetter("sources")
-  }
-  |
-  {
-    "result": itemgetter("prompt") | chat_model | StrOutputParser(),
-    "sources": itemgetter("sources")
-  }
+# Process all questions through this chain
+answer_all_questions_chain = (
+    RunnablePassthrough() |
+        {
+            "relevant_docs": generate_query_to_retrieve_context_prompt | chat_model | StrOutputParser() | retriever,
+            "chat_history": itemgetter("chat_history"),
+            "question": itemgetter("question")
+        }
+    |
+        {
+            "context": itemgetter("relevant_docs") | RunnableLambda(format_context),
+            "sources": itemgetter("relevant_docs") | RunnableLambda(extract_source_urls),
+            "chat_history": itemgetter("chat_history"),
+            "question": itemgetter("question")
+        }
+    |
+        {
+            "prompt": question_with_history_and_context_prompt,
+            "sources": itemgetter("sources")
+        }
+    |
+        {
+            "result": itemgetter("prompt") | chat_model | StrOutputParser(),
+            "sources": itemgetter("sources")
+        }
 )
 
-irrelevant_question_chain = (
-  RunnableLambda(lambda x: {"result": 'I cannot answer questions that are not about Databricks.', "sources": []})
-)
-
-branch_node = RunnableBranch(
-  (lambda x: "yes" in x["question_is_relevant"].lower(), relevant_question_chain),
-  (lambda x: "no" in x["question_is_relevant"].lower(), irrelevant_question_chain),
-  irrelevant_question_chain
-)
-
+# Full chain that always navigates to answer_all_questions_chain
 full_chain = (
-  {
-    "question_is_relevant": is_about_databricks_chain,
-    "question": itemgetter("messages") | RunnableLambda(extract_question),
-    "chat_history": itemgetter("messages") | RunnableLambda(extract_history),    
-  }
-  | branch_node
+    {
+        "question": itemgetter("messages") | RunnableLambda(extract_question),
+        "chat_history": itemgetter("messages") | RunnableLambda(extract_history),
+    }
+    | answer_all_questions_chain
 )
 
-# COMMAND ----------
-
-# MAGIC %md 
-# MAGIC Let's try our full chain:
-
-# COMMAND ----------
-
-# DBTITLE 1,Asking an out-of-scope question
-import json
-non_relevant_dialog = {
-    "messages": [
-        {"role": "user", "content": "What is Apache Spark?"}, 
-        {"role": "assistant", "content": "Apache Spark is an open-source data processing engine that is widely used in big data analytics."}, 
-        {"role": "user", "content": "Why is the sky blue?"}
-    ]
-}
-print(f'Testing with a non relevant question...')
-response = full_chain.invoke(non_relevant_dialog)
-display_chat(non_relevant_dialog["messages"], response)
-
-# COMMAND ----------
-
-# DBTITLE 1,Asking a relevant question
-dialog = {
-    "messages": [
-        {"role": "user", "content": "What is Apache Spark?"}, 
-        {"role": "assistant", "content": "Apache Spark is an open-source data processing engine that is widely used in big data analytics."}, 
-        {"role": "user", "content": "Does it support streaming?"}
-    ]
-}
-print(f'Testing with relevant history and question...')
-response = full_chain.invoke(dialog)
-display_chat(dialog["messages"], response)
+# Example usage:
+result = full_chain.invoke({ "messages": [ {"role": "user", "content": "What is Apache Spark?"}, {"role": "assistant", "content": "Apache Spark is an open-source data processing engine that is widely used in big data analytics."}, {"role": "user", "content": "Who is Ian Zhao?"} ] })
+print(result)
 
 # COMMAND ----------
 
@@ -479,7 +440,7 @@ import langchain
 from mlflow.models import infer_signature
 
 mlflow.set_registry_uri("databricks-uc")
-model_name = f"{catalog}.{db}.gpt_advanced_chatbot_model"
+model_name = f"{catalog}.{db}.gpt_advanced_chatbot_model_armhub"
 
 with mlflow.start_run(run_name="gpt_chatbot_rag") as run:
     #Get our model signature from input/output

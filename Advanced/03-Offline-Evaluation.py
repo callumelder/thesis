@@ -36,11 +36,7 @@
 
 # COMMAND ----------
 
-import os
-
-print(os.getcwd())
-
-%run ./_resources/00-init-advanced $reset_all_data=false
+# MAGIC %run ./_resources/00-init-advanced $reset_all_data=false
 
 # COMMAND ----------
 
@@ -338,11 +334,11 @@ from langchain_community.chat_models import ChatDatabricks
 from langchain_core.messages import HumanMessage
 from mlflow.deployments import get_deploy_client
 
-# create endpoint for gpt4 model
+# create endpoint for ada-002 model
 
 client = get_deploy_client("databricks")
 
-name = "text-embedding-ada-002"  # rename this if my-chat already exists
+name = "text-embedding-ada-002"
 try:
   client.create_endpoint(
     name=name,

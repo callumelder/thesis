@@ -36,7 +36,7 @@
 
 # COMMAND ----------
 
-# MAGIC %run ./_resources/00-init-advanced $reset_all_data=false
+# MAGIC %run ../_resources/00-init-advanced $reset_all_data=false
 
 # COMMAND ----------
 
@@ -62,7 +62,7 @@
 from mlflow.deployments import get_deploy_client
 endpoint_name = "claude-2-chat-endpoint"
 try:
-    client = mlflow.deployments.get_deploy_client("databricks")
+    client = get_deploy_client("databricks")
 
     client.create_endpoint(
         name=endpoint_name,
@@ -149,6 +149,8 @@ display(spark.table('evaluation_dataset'))
 # COMMAND ----------
 
 import mlflow
+import os
+
 os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get("dbdemos-callum", "rag_sp_token")
 model_name = f"{catalog}.{db}.gpt_advanced_chatbot_model_armhub"
 model_version_to_evaluate = get_latest_model_version(model_name)
@@ -321,48 +323,12 @@ display(data)
 
 from langchain_community.embeddings import DatabricksEmbeddings
 
-databricks_embedding_model = DatabricksEmbeddings(endpoint="databricks-bge-large-en")
+bge_embedding_model = DatabricksEmbeddings(endpoint="databricks-bge-large-en")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ##OpenAI Embedding Models
-
-# COMMAND ----------
-
-from langchain_community.chat_models import ChatDatabricks
-from langchain_core.messages import HumanMessage
-from mlflow.deployments import get_deploy_client
-
-# create endpoint for ada-002 model
-
-client = get_deploy_client("databricks")
-
-name = "text-embedding-ada-002"
-try:
-  client.create_endpoint(
-    name=name,
-    config={
-      "served_entities": [
-        {
-          "name": name,
-          "external_model": {
-            "name": name,
-            "provider": "openai",
-            "task": "llm/v1/embeddings",
-              "openai_config": {
-            "openai_api_key": "{{secrets/my_openai_secret_scope/openai_api_key}}"
-            }
-          },
-        }
-      ],
-    },
-  )
-except Exception as e:
-  if 'RESOURCE_ALREADY_EXISTS' in str(e):
-    print('Endpoint already exists')
-  else:
-    print(e)
 
 # COMMAND ----------
 
@@ -373,11 +339,13 @@ ada_embedding_model = DatabricksEmbeddings(endpoint="text-embedding-ada-002")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ##Cohere Embedding Model
+# MAGIC ##OpenAI Large Embedding Model
 
 # COMMAND ----------
 
+from langchain_community.embeddings import DatabricksEmbeddings
 
+openai_large_embedding_model = DatabricksEmbeddings(endpoint="text-embedding-3-large")
 
 # COMMAND ----------
 
@@ -393,7 +361,8 @@ import os
 
 os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get("dbdemos-callum", "rag_sp_token")
 
-index_name=f"prototype.rag_chatbot_zhuoyang_zhao.armhub_pdf_documentation_self_managed_vs_index"
+VECTOR_SEARCH_ENDPOINT_NAME = "500_25_experimental_vector_search" # change for each experiment
+index_name = "main.rag_chatbot_callum_elder.500_25_experimental_bge_self_managed_vs_index" # change for each embedding index
 host = "https://" + spark.conf.get("spark.databricks.workspaceUrl")
 
 def get_retriever(embedding_model, persist_dir: str = None):
@@ -411,7 +380,7 @@ def get_retriever(embedding_model, persist_dir: str = None):
     )
     return vectorstore.as_retriever(search_kwargs={'k': 4})
 
-retriever = get_retriever(ada_embedding_model)
+retriever = get_retriever(bge_embedding_model)  # change for each embedding model
 
 # COMMAND ----------
 
@@ -435,7 +404,7 @@ print(data)
 
 # COMMAND ----------
 
-data.to_csv("databricks_retrieval_dataset.csv", index=False)
+data.to_csv("500_25_bge_retrieval_dataset.csv", index=False)
 
 # COMMAND ----------
 
@@ -464,7 +433,7 @@ display(evaluate_results.tables["eval_results_table"])
 
 # COMMAND ----------
 
-evaluate_results.tables["eval_results_table"].to_csv("databricks_evaluate_results.csv", index=False)
+evaluate_results.tables["eval_results_table"].to_csv("500_25_bge_evaluate_results.csv", index=False)
 
 # COMMAND ----------
 

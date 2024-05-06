@@ -362,7 +362,7 @@ import os
 os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get("dbdemos-callum", "rag_sp_token")
 
 VECTOR_SEARCH_ENDPOINT_NAME = "500_25_experimental_vector_search" # change for each experiment
-index_name = "main.rag_chatbot_callum_elder.500_25_experimental_bge_self_managed_vs_index" # change for each embedding index
+index_name = "main.rag_chatbot_callum_elder.500_25_experimental_openai_large_self_managed_vs_index" # change for each embedding index
 host = "https://" + spark.conf.get("spark.databricks.workspaceUrl")
 
 def get_retriever(embedding_model, persist_dir: str = None):
@@ -380,7 +380,7 @@ def get_retriever(embedding_model, persist_dir: str = None):
     )
     return vectorstore.as_retriever(search_kwargs={'k': 4})
 
-retriever = get_retriever(bge_embedding_model)  # change for each embedding model
+retriever = get_retriever(openai_large_embedding_model)  # change for each embedding model
 
 # COMMAND ----------
 
@@ -404,7 +404,7 @@ print(data)
 
 # COMMAND ----------
 
-data.to_csv("500_25_bge_retrieval_dataset.csv", index=False)
+data.to_csv("500_25_openai_large_retrieval_dataset.csv", index=False)
 
 # COMMAND ----------
 
@@ -433,7 +433,51 @@ display(evaluate_results.tables["eval_results_table"])
 
 # COMMAND ----------
 
-evaluate_results.tables["eval_results_table"].to_csv("500_25_bge_evaluate_results.csv", index=False)
+evaluate_results.tables["eval_results_table"].to_csv("500_25_openai_large_evaluate_results.csv", index=False)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ##Plot Values
+
+# COMMAND ----------
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+datasets = ["500_25_bge_evaluate_results.csv", "500_25_ada_evaluate_results.csv", "500_25_openai_large_evaluate_results.csv"]
+metrics = ["precision", "recall", "ndcg"]
+names = ["bge", "ada", "openai_large"]
+k_values = [1, 2, 3]
+
+# Create a figure with subplots for each metric
+fig, axes = plt.subplots(1, len(metrics), figsize=(15, 5))
+
+for i, metric_name in enumerate(metrics):
+    for j, k in enumerate(k_values):
+        x = [j + dataset_index * (len(k_values) + 1) for dataset_index in range(len(datasets))]
+        y = [pd.read_csv(dataset)[f"{metric_name}_at_{k}/score"].mean() for dataset in datasets]
+        axes[i].bar(x, y, width=0.8, label=f"k={k}")
+
+    axes[i].set_xlabel("Dataset")
+    axes[i].set_ylabel(f"{metric_name.capitalize()} Value Mean")
+    axes[i].set_title(f"{metric_name.capitalize()}@k")
+    axes[i].set_xticks([i * (len(k_values) + 1) + (len(k_values) - 1) / 2 for i in range(len(datasets))])
+    axes[i].set_xticklabels(names)
+    axes[i].set_ylim(0, 1)
+    axes[i].legend()
+
+# Add an overall title
+fig.suptitle("Evaluation Metrics for Chunking Strategy 500/25", fontsize=16)
+
+# Adjust the spacing between subplots
+plt.tight_layout()
+
+# Save the plot to a file
+plt.savefig("evaluation_metrics_plot_500_25.png")
+
+# Display the plot
+plt.show()
 
 # COMMAND ----------
 

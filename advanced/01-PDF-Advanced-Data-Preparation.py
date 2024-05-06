@@ -625,7 +625,10 @@ wait_for_index_to_be_ready(vsc, VECTOR_SEARCH_ENDPOINT_NAME, vs_index_fullname)
 
 question = "Can you tell me about recent armhub projects?"
 
-response = deploy_client.predict(endpoint="databricks-bge-large-en", inputs={"input": [question]})
+vs_index_fullname = "main.rag_chatbot_callum_elder.500_25_experimental_ada_self_managed_vs_index"
+embedding_endpoint = "text-embedding-ada-002"
+
+response = deploy_client.predict(endpoint=embedding_endpoint, inputs={"input": [question]})
 embeddings = [e['embedding'] for e in response.data]
 
 results = vsc.get_index(VECTOR_SEARCH_ENDPOINT_NAME, vs_index_fullname).similarity_search(

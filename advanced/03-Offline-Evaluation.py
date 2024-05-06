@@ -457,21 +457,30 @@ for i, metric_name in enumerate(metrics):
     for j, k in enumerate(k_values):
         x = [j + dataset_index * (len(k_values) + 1) for dataset_index in range(len(datasets))]
         y = [pd.read_csv(dataset)[f"{metric_name}_at_{k}/score"].mean() for dataset in datasets]
-        axes[i].bar(x, y, width=0.8, label=f"k={k}")
-
+        bars = axes[i].bar(x, y, width=0.8, label=f"k={k}")
+        
+        # Add bar values
+        for bar in bars:
+            height = bar.get_height()
+            axes[i].annotate(f'{height:.2f}',
+                             xy=(bar.get_x() + bar.get_width() / 2, height),
+                             xytext=(0, 3),  # 3 points vertical offset
+                             textcoords="offset points",
+                             ha='center', va='bottom')
+        
     axes[i].set_xlabel("Dataset")
     axes[i].set_ylabel(f"{metric_name.capitalize()} Value Mean")
     axes[i].set_title(f"{metric_name.capitalize()}@k")
     axes[i].set_xticks([i * (len(k_values) + 1) + (len(k_values) - 1) / 2 for i in range(len(datasets))])
     axes[i].set_xticklabels(names)
     axes[i].set_ylim(0, 1)
-    axes[i].legend()
+    axes[i].legend(loc='upper left')
 
 # Add an overall title
 fig.suptitle("Evaluation Metrics for Chunking Strategy 500/25", fontsize=16)
 
-# Adjust the spacing between subplots
-plt.tight_layout()
+# Adjust the spacing between subplots and the overall title
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
 # Save the plot to a file
 plt.savefig("evaluation_metrics_plot_500_25.png")

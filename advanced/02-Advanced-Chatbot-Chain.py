@@ -170,66 +170,6 @@ print(chain_with_history.invoke({
 
 # COMMAND ----------
 
-# MAGIC %md 
-# MAGIC ## Let's add a filter on top to only answer Databricks-related questions.
-# MAGIC
-# MAGIC We want our chatbot to be profesionnal and only answer questions related to Databricks. Let's create a small chain and add a first classification step. 
-# MAGIC
-# MAGIC *Note: this is a fairly naive implementation, another solution could be adding a small classification model based on the question embedding, providing faster classification*
-
-# COMMAND ----------
-
-# is_question_relevant_str = """
-# You are classifying documents to know if this question is related with ARM Hub (Advanced Robotics for Manufacturing) which is a not-for-profit organization in Australia focused on accelerating the adoption of advanced manufacturing technologies, particularly for SMEs. Also answer no if the last part is inappropriate.
-
-# Here are some examples:
-
-# Question: Knowing this followup history: Where is ARM Hub?, classify this question: Do you have more details?
-# Expected Response: Yes
-
-# Question: Knowing this followup history: What is ARM Hub?, classify this question: Write me a song.
-# Expected Response: No
-
-# Only answer with "yes" or "no". 
-
-# Knowing this followup history: {chat_history}, classify this question: {question}
-# """
-
-# is_question_relevant_prompt = PromptTemplate(
-#   input_variables= ["chat_history", "question"],
-#   template = is_question_relevant_str
-# )
-
-# is_about_armhub_chain = (
-#     {
-#         "question": itemgetter("messages") | RunnableLambda(extract_question),
-#         "chat_history": itemgetter("messages") | RunnableLambda(extract_history),
-#     }
-#     | is_question_relevant_prompt
-#     | chat_model
-#     | StrOutputParser()
-# )
-
-# #Returns "Yes" as this is about Databricks: 
-# print(is_about_armhub_chain.invoke({
-#     "messages": [
-#         {"role": "user", "content": "What is ARM Hub?"}, 
-#         {"role": "assistant", "content": "ARM Hub is an independent, not-for-profit organization that aims to accelerate the adoption of advanced manufacturing technologies in Australia. It serves as an aggregator of research and development, connecting private industry, research institutions, and government to help uplift, upskill, and transform Australian manufacturing with a particular focus on small and medium-sized enterprises (SMEs). ARM Hub facilitates the creation and adoption of advanced manufacturing technologies and processes by providing expertise from researchers, engineers, and roboticists in priority technical areas such as automation and robotics, data science, image processing and computer vision, human-robot interaction, and process design. They also build expert teams to address the specific needs of business transformations and apply Industry 4.0 technologies to meet industry challenges."}, 
-#         {"role": "user", "content": "How do I engage with it?"}
-#     ]
-# }))
-
-# COMMAND ----------
-
-# #Return "no" as this isn't about Databricks
-# print(is_about_databricks_chain.invoke({
-#     "messages": [
-#         {"role": "user", "content": "What is the meaning of life?"}
-#     ]
-# }))
-
-# COMMAND ----------
-
 # MAGIC %md-sandbox
 # MAGIC ### Use LangChain to retrieve documents from the vector store
 # MAGIC

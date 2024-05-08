@@ -53,8 +53,7 @@ from mlflow.deployments import get_deploy_client
 
 client = get_deploy_client("databricks")
 
-secret = "secrets/<scope>/openai-api-key"  # replace `<scope>` with your scope
-name = "callums-gpt-endpoint"  # rename this if my-chat already exists
+name = "callums-gpt-endpoint"  # rename when creating new endpoint
 try:
   client.create_endpoint(
     name=name,
@@ -102,7 +101,7 @@ chain = (
   | chat_model
   | StrOutputParser()
 )
-print(chain.invoke({"question": "How do I engage with ARM Hub?"}))
+print(chain.invoke({"question": "Who founded google?"}))
 
 # COMMAND ----------
 
@@ -112,7 +111,7 @@ print(chain.invoke({"question": "How do I engage with ARM Hub?"}))
 # COMMAND ----------
 
 prompt_with_history_str = """
-Your are a ARM Hub's chatbot. Please answer ARM Hub Related question only. If you don't know or not related to ARM Hub, don't answer.
+You are a ARM Hub's chatbot. Please answer ARM Hub Related questions only. If you don't know the answer or it is not related to ARM Hub, don't answer.
 
 Here is a history between you and a human: {chat_history}
 
@@ -163,7 +162,7 @@ chain_with_history = (
 
 print(chain_with_history.invoke({
     "messages": [
-        {"role": "user", "content": "how do i engage with ARM Hub?"}, 
+        {"role": "user", "content": "How do I engage with ARM Hub?"}, 
         {"role": "assistant", "content": "To engage with ARM Hub, you can start by visiting their website and exploring the various resources and tools available. You can also sign up for their newsletter to stay up-to-date on the latest news and developments in the ARM ecosystem. Additionally, you can participate in online communities and forums related to ARM technology to connect with other developers and users.."}, 
         {"role": "user", "content": "Where is ARM Hub?"}
     ]
@@ -180,54 +179,54 @@ print(chain_with_history.invoke({
 
 # COMMAND ----------
 
-is_question_about_databricks_str = """
-You are classifying documents to know if this question is related with ARM Hub (Advanced Robotics for Manufacturing) which is a not-for-profit organization in Australia focused on accelerating the adoption of advanced manufacturing technologies, particularly for SMEs. Also answer no if the last part is inappropriate.
+# is_question_relevant_str = """
+# You are classifying documents to know if this question is related with ARM Hub (Advanced Robotics for Manufacturing) which is a not-for-profit organization in Australia focused on accelerating the adoption of advanced manufacturing technologies, particularly for SMEs. Also answer no if the last part is inappropriate.
 
-Here are some examples:
+# Here are some examples:
 
-Question: Knowing this followup history: Where is ARM Hub?, classify this question: Do you have more details?
-Expected Response: Yes
+# Question: Knowing this followup history: Where is ARM Hub?, classify this question: Do you have more details?
+# Expected Response: Yes
 
-Question: Knowing this followup history: What is ARM Hub?, classify this question: Write me a song.
-Expected Response: No
+# Question: Knowing this followup history: What is ARM Hub?, classify this question: Write me a song.
+# Expected Response: No
 
-Only answer with "yes" or "no". 
+# Only answer with "yes" or "no". 
 
-Knowing this followup history: {chat_history}, classify this question: {question}
-"""
+# Knowing this followup history: {chat_history}, classify this question: {question}
+# """
 
-is_question_about_databricks_prompt = PromptTemplate(
-  input_variables= ["chat_history", "question"],
-  template = is_question_about_databricks_str
-)
+# is_question_relevant_prompt = PromptTemplate(
+#   input_variables= ["chat_history", "question"],
+#   template = is_question_relevant_str
+# )
 
-is_about_databricks_chain = (
-    {
-        "question": itemgetter("messages") | RunnableLambda(extract_question),
-        "chat_history": itemgetter("messages") | RunnableLambda(extract_history),
-    }
-    | is_question_about_databricks_prompt
-    | chat_model
-    | StrOutputParser()
-)
+# is_about_armhub_chain = (
+#     {
+#         "question": itemgetter("messages") | RunnableLambda(extract_question),
+#         "chat_history": itemgetter("messages") | RunnableLambda(extract_history),
+#     }
+#     | is_question_relevant_prompt
+#     | chat_model
+#     | StrOutputParser()
+# )
 
-#Returns "Yes" as this is about Databricks: 
-print(is_about_databricks_chain.invoke({
-    "messages": [
-        {"role": "user", "content": "What is ARM Hub?"}, 
-        {"role": "assistant", "content": "ARM Hub is an independent, not-for-profit organization that aims to accelerate the adoption of advanced manufacturing technologies in Australia. It serves as an aggregator of research and development, connecting private industry, research institutions, and government to help uplift, upskill, and transform Australian manufacturing with a particular focus on small and medium-sized enterprises (SMEs). ARM Hub facilitates the creation and adoption of advanced manufacturing technologies and processes by providing expertise from researchers, engineers, and roboticists in priority technical areas such as automation and robotics, data science, image processing and computer vision, human-robot interaction, and process design. They also build expert teams to address the specific needs of business transformations and apply Industry 4.0 technologies to meet industry challenges."}, 
-        {"role": "user", "content": "How do I engage it?"}
-    ]
-}))
+# #Returns "Yes" as this is about Databricks: 
+# print(is_about_armhub_chain.invoke({
+#     "messages": [
+#         {"role": "user", "content": "What is ARM Hub?"}, 
+#         {"role": "assistant", "content": "ARM Hub is an independent, not-for-profit organization that aims to accelerate the adoption of advanced manufacturing technologies in Australia. It serves as an aggregator of research and development, connecting private industry, research institutions, and government to help uplift, upskill, and transform Australian manufacturing with a particular focus on small and medium-sized enterprises (SMEs). ARM Hub facilitates the creation and adoption of advanced manufacturing technologies and processes by providing expertise from researchers, engineers, and roboticists in priority technical areas such as automation and robotics, data science, image processing and computer vision, human-robot interaction, and process design. They also build expert teams to address the specific needs of business transformations and apply Industry 4.0 technologies to meet industry challenges."}, 
+#         {"role": "user", "content": "How do I engage with it?"}
+#     ]
+# }))
 
 # COMMAND ----------
 
-#Return "no" as this isn't about Databricks
-print(is_about_databricks_chain.invoke({
-    "messages": [
-        {"role": "user", "content": "What is the meaning of life?"}
-    ]
-}))
+# #Return "no" as this isn't about Databricks
+# print(is_about_databricks_chain.invoke({
+#     "messages": [
+#         {"role": "user", "content": "What is the meaning of life?"}
+#     ]
+# }))
 
 # COMMAND ----------
 
@@ -247,11 +246,13 @@ print(is_about_databricks_chain.invoke({
 
 # COMMAND ----------
 
-index_name=f"prototype.rag_chatbot_zhuoyang_zhao.armhub_pdf_documentation_self_managed_vs_index"
+index_name = "main.rag_chatbot_callum_elder.250_12_experimental_openai_large_self_managed_vs_index"
 host = "https://" + spark.conf.get("spark.databricks.workspaceUrl")
+embedding_endpoint_name = "text-embedding-3-large"
+VECTOR_SEARCH_ENDPOINT_NAME = "250_12_experimental_vector_search"
  
 #Let's make sure the secret is properly setup and can access our vector search index. Check the quick-start demo for more guidance
-test_demo_permissions(host, secret_scope="dbdemos-callum", secret_key="rag_sp_token", vs_endpoint_name=VECTOR_SEARCH_ENDPOINT_NAME, index_name=index_name, embedding_endpoint_name="databricks-bge-large-en", managed_embeddings = False)
+test_demo_permissions(host, secret_scope="dbdemos-callum", secret_key="rag_sp_token", vs_endpoint_name=VECTOR_SEARCH_ENDPOINT_NAME, index_name=index_name, embedding_endpoint_name=embedding_endpoint_name, managed_embeddings = False)
 
 # COMMAND ----------
 
@@ -262,7 +263,7 @@ from langchain.chains import RetrievalQA
 
 os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get("dbdemos-callum", "rag_sp_token")
 
-embedding_model = DatabricksEmbeddings(endpoint="databricks-bge-large-en")
+embedding_model = DatabricksEmbeddings(endpoint=embedding_endpoint_name)
 
 def get_retriever(persist_dir: str = None):
     os.environ["DATABRICKS_HOST"] = host
@@ -302,7 +303,7 @@ print(retrieve_document_chain.invoke({"messages": [{"role": "user", "content": "
 from langchain.schema.runnable import RunnableBranch
 
 generate_query_to_retrieve_context_template = """
-Based on the chat history below, we want you to generate a query for an external data source to retrieve relevant documents so that we can better answer the question. The query should be in natual language. The external data source uses similarity search to search for relevant documents in a vector space. So the query should be similar to the relevant documents semantically. Answer with only the query. Do not add explanation.
+Based on the chat history below, we want you to generate a query for an external data source to retrieve relevant documents so that we can better answer the question. The query should be in natural language. The external data source uses similarity search to search for relevant documents in a vector space. So the query should be similar to the relevant documents semantically. Answer with only the query. Do not add explanation.
 
 Chat history: {chat_history}
 
@@ -367,7 +368,7 @@ from operator import itemgetter
 
 # Template to handle any questions, assuming all are relevant
 question_with_history_and_context_str = """
-You are a chatbot answer the questions.
+You are a chatbot, answer the questions.
 Discussion: {chat_history}
 
 Here's some context which might or might not help you answer: {context}
@@ -440,7 +441,15 @@ import langchain
 from mlflow.models import infer_signature
 
 mlflow.set_registry_uri("databricks-uc")
-model_name = f"{catalog}.{db}.gpt_advanced_chatbot_model_armhub"
+model_name = f"{catalog}.{db}.gpt_optimized_chatbot_model_thesis"
+
+dialog = {
+    "messages": [
+        {"role": "user", "content": "What is ARM Hub?"}, 
+        {"role": "assistant", "content": "ARM Hub is an independent, not-for-profit organization that aims to accelerate the adoption of advanced manufacturing technologies in Australia. It serves as an aggregator of research and development, connecting private industry, research institutions, and government to help uplift, upskill, and transform Australian manufacturing with a particular focus on small and medium-sized enterprises (SMEs). ARM Hub facilitates the creation and adoption of advanced manufacturing technologies and processes by providing expertise from researchers, engineers, and roboticists in priority technical areas such as automation and robotics, data science, image processing and computer vision, human-robot interaction, and process design. They also build expert teams to address the specific needs of business transformations and apply Industry 4.0 technologies to meet industry challenges."}, 
+        {"role": "user", "content": "How do I engage it?"}
+    ]
+}
 
 with mlflow.start_run(run_name="gpt_chatbot_rag") as run:
     #Get our model signature from input/output

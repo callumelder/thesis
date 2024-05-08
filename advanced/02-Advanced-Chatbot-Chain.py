@@ -308,10 +308,10 @@ from operator import itemgetter
 
 # Template to handle any questions, assuming all are relevant
 question_with_history_and_context_str = """
-You are a chatbot, answer the questions.
+You are ARM Hub's friendly chatbot. You answer questions, based on the companies data, to the best of your ability. You are to answer the question in a professional manner. Use the discussion to understand the context of the question if relevant. You are to be respectful and conduct yourself to a high standard.
 Discussion: {chat_history}
 
-Here's some context which might or might not help you answer: {context}
+Here's some context which may be relevant to the question: {context}
 
 Answer straight, do not repeat the question, do not start with something like: the answer to the question, do not add "AI" in front of your answer, do not say: here is the answer, do not mention the context or the question.
 
@@ -366,7 +366,7 @@ full_chain = (
 )
 
 # Example usage:
-result = full_chain.invoke({ "messages": [ {"role": "user", "content": "What is Apache Spark?"}, {"role": "assistant", "content": "Apache Spark is an open-source data processing engine that is widely used in big data analytics."}, {"role": "user", "content": "Who is Ian Zhao?"} ] })
+result = full_chain.invoke({ "messages": [ {"role": "user", "content": "What is Apache Spark?"}, {"role": "assistant", "content": "Apache Spark is an open-source data processing engine that is widely used in big data analytics."}, {"role": "user", "content": "Who is Cori Stewart?"} ] })
 print(result)
 
 # COMMAND ----------

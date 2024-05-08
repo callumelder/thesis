@@ -143,7 +143,8 @@ def predict_answer(questions):
 
 df_qa = (spark.read.table('evaluation_dataset')
                   .selectExpr('question as inputs', 'answer as targets')
-                  .where("targets is not null"))
+                  .where("targets is not null")
+                  .sample(fraction=0.5, seed=40))
 
 df_qa_with_preds = df_qa.withColumn('preds', predict_answer(col('inputs'))).cache()
 

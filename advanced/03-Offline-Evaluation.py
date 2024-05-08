@@ -143,8 +143,7 @@ def predict_answer(questions):
 
 df_qa = (spark.read.table('evaluation_dataset')
                   .selectExpr('question as inputs', 'answer as targets')
-                  .where("targets is not null")
-                  .sample(fraction=0.005, seed=40)) #small sample for interactive demo
+                  .where("targets is not null"))
 
 df_qa_with_preds = df_qa.withColumn('preds', predict_answer(col('inputs'))).cache()
 
@@ -252,7 +251,13 @@ eval_results.metrics
 
 # COMMAND ----------
 
+base_name = 'base_prompt'
+
+# COMMAND ----------
+
 import pandas as pd
+
+filename = base_name + '_metrics_mean.csv'
 
 # Extract the desired metrics from eval_results.metrics
 answer_correctness_mean = eval_results.metrics['answer_correctness/v1/mean']
@@ -274,43 +279,59 @@ df_mean = pd.DataFrame(data)
 print(df_mean)
 
 # Store dataframe as csv
-df_mean.to_csv("base_prompt_metrics_mean.csv", index=False)
+df_mean.to_csv(filename, index=False)
 
 # COMMAND ----------
 
+filename = base_name + '_metrics.csv'
 df_genai_metrics = eval_results.tables["eval_results_table"]
 display(df_genai_metrics)
-df_genai_metrics.to_csv("base_prompt_metrics.csv", index=False)
+df_genai_metrics.to_csv(filename, index=False)
 
 # COMMAND ----------
 
 import matplotlib.pyplot as plt
 
+filename = base_name + '_token.png'
 plt.figure()
 plt.hist(df_genai_metrics['token_count'], bins=20, edgecolor='black')
 plt.xlabel('Token Count')
 plt.ylabel('Frequency')
 plt.title('Distribution of Token Counts in Model Responses')
+plt.savefig(filename)
 plt.show()
 
 # COMMAND ----------
 
 import matplotlib.pyplot as plt
+
+filename = base_name + '_answer_correctness.png'
 
 # Count the occurrences of each answer correctness score
 score_counts = df_genai_metrics['answer_correctness/v1/score'].value_counts()
 
 # Create a bar plot
 plt.figure()
-plt.bar(score_counts.index, score_counts.values)
+bars = plt.bar(score_counts.index, score_counts.values)
+
+# Add count labels above each bar
+for bar in bars:
+    count = bar.get_height()
+    plt.text(bar.get_x() + bar.get_width() / 2, count + 0.1, str(int(count)),
+             ha='center', va='bottom')
+
 plt.xlabel('Answer Correctness Score')
 plt.ylabel('Count')
 plt.title('Answer Correctness Score Distribution')
+plt.xticks(score_counts.index)  # Set the x-tick labels to the score values
+plt.savefig(filename)
 plt.show()
 
 # COMMAND ----------
 
 import matplotlib.pyplot as plt
+
+filename = base_name + '_toxicity_vs_correctness.png'
 
 df_genai_metrics['toxicity'] = df_genai_metrics['toxicity/v1/score'] * 100
 
@@ -321,12 +342,15 @@ plt.ylabel('Answer Correctness Score')
 plt.title('Toxicity vs Correctness')
 plt.grid(True)
 plt.xticks(rotation=45)
-plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.4f'))
+plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1f'))
+plt.savefig(filename)
 plt.show()
 
 # COMMAND ----------
 
 import matplotlib.pyplot as plt
+
+filename = base_name + '_professionalism.png'
 
 # Create bins from 1 to 5 for professionalism scores
 bins = [1, 2, 3, 4, 5, 6]  # Add 6 as the upper limit of the last bin
@@ -339,11 +363,19 @@ bin_counts = professionalism_bins.value_counts(sort=False)
 
 # Create a bar plot
 plt.figure()
-plt.bar(bin_counts.index.map(lambda x: int(x.left)), bin_counts.values)
+bars = plt.bar(bin_counts.index.map(lambda x: int(x.left)), bin_counts.values)
+
+# Add count labels above each bar
+for bar in bars:
+    count = bar.get_height()
+    plt.text(bar.get_x() + bar.get_width() / 2, count + 0.1, str(int(count)),
+             ha='center', va='bottom')
+
 plt.xlabel('Professionalism Score')
 plt.ylabel('Count')
 plt.title('Professionalism Score Distribution')
 plt.xticks(range(1, 6))  # Set the x-tick labels from 1 to 5
+plt.savefig(filename)
 plt.show()
 
 # COMMAND ----------

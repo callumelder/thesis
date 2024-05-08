@@ -127,7 +127,7 @@ import mlflow
 import os
 
 os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get("dbdemos-callum", "rag_sp_token")
-model_name = f"{catalog}.{db}.gpt_advanced_chatbot_model_armhub"
+model_name = f"{catalog}.{db}.gpt_optimized_chatbot_model_thesis" # Adjust model being tested
 model_version_to_evaluate = get_latest_model_version(model_name)
 mlflow.set_registry_uri("databricks-uc")
 rag_model = mlflow.langchain.load_model(f"models:/{model_name}/{model_version_to_evaluate}")
@@ -252,24 +252,99 @@ eval_results.metrics
 
 # COMMAND ----------
 
+import pandas as pd
+
+# Extract the desired metrics from eval_results.metrics
+answer_correctness_mean = eval_results.metrics['answer_correctness/v1/mean']
+answer_correctness_variance = eval_results.metrics['answer_correctness/v1/variance']
+professionalism_mean = eval_results.metrics['professionalism/v1/mean']
+professionalism_variance = eval_results.metrics['professionalism/v1/variance']
+
+data = {
+    'answer_correctness_mean': [answer_correctness_mean],
+    'answer_correctness_var': [answer_correctness_variance],
+    'professionalism_mean': [professionalism_mean],
+    'professionalism_var' : [professionalism_variance]
+}
+
+# Create a DataFrame from the dictionary
+df_mean = pd.DataFrame(data)
+
+# Display the DataFrame
+print(df_mean)
+
+# Store dataframe as csv
+df_mean.to_csv("base_prompt_metrics_mean.csv", index=False)
+
+# COMMAND ----------
+
 df_genai_metrics = eval_results.tables["eval_results_table"]
 display(df_genai_metrics)
+df_genai_metrics.to_csv("base_prompt_metrics.csv", index=False)
 
 # COMMAND ----------
 
-import plotly.express as px
-px.histogram(df_genai_metrics, x="token_count", labels={"token_count": "Token Count"}, title="Distribution of Token Counts in Model Responses")
+import matplotlib.pyplot as plt
+
+plt.figure()
+plt.hist(df_genai_metrics['token_count'], bins=20, edgecolor='black')
+plt.xlabel('Token Count')
+plt.ylabel('Frequency')
+plt.title('Distribution of Token Counts in Model Responses')
+plt.show()
 
 # COMMAND ----------
 
-# Counting the occurrences of each answer correctness score
-px.bar(df_genai_metrics['answer_correctness/v1/score'].value_counts(), title='Answer Correctness Score Distribution')
+import matplotlib.pyplot as plt
+
+# Count the occurrences of each answer correctness score
+score_counts = df_genai_metrics['answer_correctness/v1/score'].value_counts()
+
+# Create a bar plot
+plt.figure()
+plt.bar(score_counts.index, score_counts.values)
+plt.xlabel('Answer Correctness Score')
+plt.ylabel('Count')
+plt.title('Answer Correctness Score Distribution')
+plt.show()
 
 # COMMAND ----------
+
+import matplotlib.pyplot as plt
 
 df_genai_metrics['toxicity'] = df_genai_metrics['toxicity/v1/score'] * 100
-fig = px.scatter(df_genai_metrics, x='toxicity', y='answer_correctness/v1/score', title='Toxicity vs Correctness', size=[10]*len(df_genai_metrics))
-fig.update_xaxes(tickformat=".2f")
+
+plt.figure()
+plt.scatter(df_genai_metrics['toxicity'], df_genai_metrics['answer_correctness/v1/score'], s=100)
+plt.xlabel('Toxicity')
+plt.ylabel('Answer Correctness Score')
+plt.title('Toxicity vs Correctness')
+plt.grid(True)
+plt.xticks(rotation=45)
+plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.4f'))
+plt.show()
+
+# COMMAND ----------
+
+import matplotlib.pyplot as plt
+
+# Create bins from 1 to 5 for professionalism scores
+bins = [1, 2, 3, 4, 5, 6]  # Add 6 as the upper limit of the last bin
+
+# Cut the professionalism scores into bins
+professionalism_bins = pd.cut(df_genai_metrics['professionalism/v1/score'], bins=bins, right=False)
+
+# Count the occurrences of each bin
+bin_counts = professionalism_bins.value_counts(sort=False)
+
+# Create a bar plot
+plt.figure()
+plt.bar(bin_counts.index.map(lambda x: int(x.left)), bin_counts.values)
+plt.xlabel('Professionalism Score')
+plt.ylabel('Count')
+plt.title('Professionalism Score Distribution')
+plt.xticks(range(1, 6))  # Set the x-tick labels from 1 to 5
+plt.show()
 
 # COMMAND ----------
 

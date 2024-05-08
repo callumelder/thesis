@@ -1,29 +1,4 @@
 # Databricks notebook source
-# MAGIC %md-sandbox
-# MAGIC
-# MAGIC # 3/ Evaluating the RAG Chat Bot with LLMs-as-a-Judge for automated evaluation
-# MAGIC
-# MAGIC <img src="https://github.com/databricks-demos/dbdemos-resources/blob/main/images/product/chatbot-rag/llm-rag-llm-as-a-judge.png?raw=true" style="float: right" width="900px">
-# MAGIC
-# MAGIC Now that our RAG model is deployed, we aim to evaluate its predictions correctness.
-# MAGIC
-# MAGIC Evaluating LLMs can be challenging as existing benchmarks and metrics can not measure them comprehensively. Humans are often involved in these tasks (see [RLHF](https://en.wikipedia.org/wiki/Reinforcement_learning_from_human_feedback), but it doesn't scale well: humans are slow and expensive!
-# MAGIC
-# MAGIC ## Introducing LLM-as-a-Judge
-# MAGIC
-# MAGIC In this notebook, we'll automate the evaluation process with a trending approach in the LLM community: **LLMs-as-a-judge**.
-# MAGIC
-# MAGIC Faster and cheaper than human evaluation, LLM-as-a-Judge leverages an external agent who judges the generative model predictions given what is expected from it.
-# MAGIC
-# MAGIC Superior models are typically used for such evaluation (e.g. `llama2-70B` judges `llama2-7B`, or `GPT4` judges `llama2-70B`)
-# MAGIC
-# MAGIC We'll explore the new LLMs-as-a-judges evaluation methods introduced in MLflow 2.9, with its powerful `mlflow.evaluate()`API.+
-# MAGIC
-# MAGIC <!-- Collect usage data (view). Remove it to disable collection or disable tracker during installation. View README for more details.  -->
-# MAGIC <img width="1px" src="https://ppxrzfxige.execute-api.us-west-2.amazonaws.com/v1/analytics?category=data-science&org_id=5890053377436761&notebook=%2F02-advanced%2F03-Offline-Evaluation&demo_name=llm-rag-chatbot&event=VIEW&path=%2F_dbdemos%2Fdata-science%2Fllm-rag-chatbot%2F02-advanced%2F03-Offline-Evaluation&version=1">
-
-# COMMAND ----------
-
 # MAGIC %md 
 # MAGIC ### A cluster has been created for this demo
 # MAGIC To run this demo, just select the cluster `dbdemos-llm-rag-chatbot-callum_elder` from the dropdown menu ([open cluster configuration](https://adb-5890053377436761.1.azuredatabricks.net/#setting/clusters/0315-001658-1toyiaqo/configuration)). <br />
@@ -361,8 +336,8 @@ import os
 
 os.environ['DATABRICKS_TOKEN'] = dbutils.secrets.get("dbdemos-callum", "rag_sp_token")
 
-VECTOR_SEARCH_ENDPOINT_NAME = "500_25_experimental_vector_search" # change for each experiment
-index_name = "main.rag_chatbot_callum_elder.500_25_experimental_openai_large_self_managed_vs_index" # change for each embedding index
+VECTOR_SEARCH_ENDPOINT_NAME = "1000_50_experimental_vector_search" # change for each experiment
+index_name = "main.rag_chatbot_callum_elder.1000_50_experimental_openai_large_self_managed_vs_index" # change for each embedding index
 host = "https://" + spark.conf.get("spark.databricks.workspaceUrl")
 
 def get_retriever(embedding_model, persist_dir: str = None):
@@ -404,7 +379,7 @@ print(data)
 
 # COMMAND ----------
 
-data.to_csv("500_25_openai_large_retrieval_dataset.csv", index=False)
+data.to_csv("1000_50_openai_large_retrieval_dataset.csv", index=False)
 
 # COMMAND ----------
 
@@ -433,19 +408,21 @@ display(evaluate_results.tables["eval_results_table"])
 
 # COMMAND ----------
 
-evaluate_results.tables["eval_results_table"].to_csv("500_25_openai_large_evaluate_results.csv", index=False)
+evaluate_results.tables["eval_results_table"].to_csv("1000_50_openai_large_evaluate_results.csv", index=False)
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ##Plot Values
+# MAGIC
+# MAGIC ###Note: Collect each evaluation dataset first
 
 # COMMAND ----------
 
 import pandas as pd
 import matplotlib.pyplot as plt
 
-datasets = ["500_25_bge_evaluate_results.csv", "500_25_ada_evaluate_results.csv", "500_25_openai_large_evaluate_results.csv"]
+datasets = ["1000_50_bge_evaluate_results.csv", "1000_50_ada_evaluate_results.csv", "1000_50_openai_large_evaluate_results.csv"]
 metrics = ["precision", "recall", "ndcg"]
 names = ["bge", "ada", "openai_large"]
 k_values = [1, 2, 3]
@@ -477,13 +454,13 @@ for i, metric_name in enumerate(metrics):
     axes[i].legend(loc='upper left')
 
 # Add an overall title
-fig.suptitle("Evaluation Metrics for Chunking Strategy 500/25", fontsize=16)
+fig.suptitle("Evaluation Metrics for Chunking Strategy 1000/50", fontsize=16)
 
 # Adjust the spacing between subplots and the overall title
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
 # Save the plot to a file
-plt.savefig("evaluation_metrics_plot_500_25.png")
+plt.savefig("evaluation_metrics_plot_1000_50.png")
 
 # Display the plot
 plt.show()

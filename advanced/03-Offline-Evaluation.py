@@ -36,36 +36,11 @@
 
 from mlflow.deployments import get_deploy_client
 endpoint_name = "claude-2-chat-endpoint"
-try:
-    client = get_deploy_client("databricks")
-
-    client.create_endpoint(
-        name=endpoint_name,
-        config={
-            "served_entities": [
-                {
-                    "name": "claude-completions",
-                    "external_model": {
-                        "name": "claude-2.1",
-                        "provider": "anthropic",
-                        "task": "llm/v1/chat",
-                        "anthropic_config": {
-                            "anthropic_api_key": "{{secrets/my_anthropic_secret_scope/anthropic_api_key}}"
-                        },
-                    },
-                }
-            ],
-        },
-    )
-except Exception as e:
-    if 'RESOURCE_ALREADY_EXISTS' in str(e):
-        print('Endpoint already exists')
-    else:
-        print(f"Couldn't create the external endpoint with Anthropic Claude: {e}. Will fallback to llama2-70-B as judge. Consider using a stronger model as a judge.")
-        endpoint_name = "databricks-llama-2-70b-chat"
+client = get_deploy_client("databricks")
+endpoint_name = "databricks-dbrx-instruct"
 
 #Let's query our external model endpoint
-answer_test = client.predict(endpoint=endpoint_name, inputs={"messages": [{"role": "user", "content": "What is Apache Spark?"}], "max_tokens": 4096})
+answer_test = client.predict(endpoint=endpoint_name, inputs={"messages": [{"role": "user", "content": "What is Apache Spark?"}]})
 answer_test['choices'][0]['message']['content']
 
 # COMMAND ----------
@@ -143,8 +118,7 @@ def predict_answer(questions):
 
 df_qa = (spark.read.table('evaluation_dataset')
                   .selectExpr('question as inputs', 'answer as targets')
-                  .where("targets is not null")
-                  .sample(fraction=0.5, seed=40))
+                  .where("targets is not null"))
 
 df_qa_with_preds = df_qa.withColumn('preds', predict_answer(col('inputs'))).cache()
 
@@ -208,7 +182,7 @@ professionalism = make_genai_metric(
         "business or academic settings. "
     ),
     model=f"endpoints:/{endpoint_name}",
-    parameters={"temperature": 0.0, "max_tokens": 4096},
+    parameters={"temperature": 0.0},
     aggregations=["mean", "variance"],
     examples=[professionalism_example],
     greater_is_better=True
@@ -252,7 +226,7 @@ eval_results.metrics
 
 # COMMAND ----------
 
-base_name = 'base_prompt'
+base_name = 'few_shot_prompt'
 
 # COMMAND ----------
 
@@ -288,6 +262,17 @@ filename = base_name + '_metrics.csv'
 df_genai_metrics = eval_results.tables["eval_results_table"]
 display(df_genai_metrics)
 df_genai_metrics.to_csv(filename, index=False)
+
+# COMMAND ----------
+
+# Count null values in each row for the specified columns
+null_counts = df_genai_metrics[['professionalism/v1/score', 'answer_correctness/v1/score']].isnull().sum(axis=1)
+
+# Calculate the total count of null values
+total_null_count = null_counts.sum()
+
+# Print the total count of null values
+print("Total null values:", total_null_count)
 
 # COMMAND ----------
 

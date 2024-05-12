@@ -51,8 +51,8 @@ import mlflow
 
 mlflow.set_registry_uri('databricks-uc')
 client = MlflowClient()
-model_name = f"{catalog}.{db}.gpt_advanced_chatbot_model"
-serving_endpoint_name = f"gpt_with_claude_endpoint_advanced_{catalog}_{db}"[:63]
+model_name = f"{catalog}.{db}.gpt_optimized_chatbot_model_thesis"
+serving_endpoint_name = f"gpt_with_dbrx_thesis_endpoint"
 latest_model = client.get_model_version_by_alias(model_name, "prod")
 
 print(model_name)
@@ -82,10 +82,10 @@ serving_client.query_inference_endpoint(
     serving_endpoint_name,
     {
         "messages": [
-            {"role": "user", "content": "What is Databricks?"},
+            {"role": "user", "content": "What is ARM Hub?"},
             {
                 "role": "assistant",
-                "content": "Apache Spark is an open-source data processing engine that is widely used in big data analytics.",
+                "content": "ARM Hub is an Australian networking and consulting company, located in Brisbane.",
             },
             {"role": "user", "content": "Who founded it?"},
         ]

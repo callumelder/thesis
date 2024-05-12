@@ -279,10 +279,125 @@ output = generate_query_to_retrieve_context_chain.invoke({
     "messages": [
         {"role": "user", "content": "What is ARM Hub?"}, 
         {"role": "assistant", "content": "ARM Hub is an independent, not-for-profit organization that aims to accelerate the adoption of advanced manufacturing technologies in Australia. It serves as an aggregator of research and development, connecting private industry, research institutions, and government to help uplift, upskill, and transform Australian manufacturing with a particular focus on small and medium-sized enterprises (SMEs). ARM Hub facilitates the creation and adoption of advanced manufacturing technologies and processes by providing expertise from researchers, engineers, and roboticists in priority technical areas such as automation and robotics, data science, image processing and computer vision, human-robot interaction, and process design. They also build expert teams to address the specific needs of business transformations and apply Industry 4.0 technologies to meet industry challenges."}, 
-        {"role": "user", "content": "How do I engage it?"}
+        {"role": "user", "content": "How do I engage with it?"}
     ]
 })
 print(f"Test retriever question, summarized with history: {output}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #Relevance Chain
+
+# COMMAND ----------
+
+from langchain.prompts import PromptTemplate
+from langchain.chat_models import ChatDatabricks
+from langchain.schema.output_parser import StrOutputParser
+from operator import itemgetter
+from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
+
+def format_context(docs):
+    return "\n\n".join([d.page_content for d in docs])
+
+def extract_source_docs(docs):
+    return [d.metadata["basename"] for d in docs]
+
+# Define a new prompt that does not use history
+is_context_relevant_str = """
+You are determining whether the provided context is relevant to answering the given question.
+
+Respond with "yes" if the context contains information that is directly relevant to answering the question.
+
+Respond with "no" if the context does not contain information that is relevant to answering the question.
+
+Do not justify your answer, simply answer 'yes' or 'no'.
+
+Examples:
+Q: What is the capital of France?
+Context: Paris is the capital and largest city of France.
+A: yes
+
+Q: Who won the 2022 World Cup?
+Context: The Eiffel Tower is a famous landmark located in Paris, France.
+A: no
+
+Context: {context}
+
+Question: {question}
+
+Answer ("yes" or "no"):
+"""
+
+# Create a new prompt template that uses only the question
+is_context_relevant_prompt = PromptTemplate(
+    input_variables=["question", "context"],
+    template=is_context_relevant_str
+)
+
+# Setup the chat model
+relevance_model = ChatDatabricks(endpoint="databricks-llama-2-70b-chat", max_tokens=2)
+
+# Define a chain that only takes the current question, and ensure it produces a dictionary as expected by the prompt template
+is_context_relevant_chain = (
+  RunnablePassthrough() |
+  {
+    "question": itemgetter("messages") | RunnableLambda(extract_question),
+    "chat_history": itemgetter("messages") | RunnableLambda(extract_history),
+  }
+  |
+  {
+    "relevant_docs": generate_query_to_retrieve_context_prompt | chat_model | StrOutputParser() | retriever,
+    "question": itemgetter("question")
+  }
+  |
+  {
+    "question": itemgetter("question"),
+    "context": itemgetter("relevant_docs") | RunnableLambda(format_context),
+    "sources": itemgetter("relevant_docs") | RunnableLambda(extract_source_docs)
+  }
+  | is_context_relevant_prompt
+  | relevance_model
+  | StrOutputParser()
+)
+
+# COMMAND ----------
+
+# Example invocation of the chain
+# Assumes input is a series of messages and picks the last one as the current question
+class Document:
+    def __init__(self, page_content):
+        self.page_content = page_content
+
+test_input = {
+    "messages": [
+        {"role": "user", "content": "Who founded ARM Hub?"},
+        {"role": "assistant", "content": "ARM Hub was founded by Cori Stewart."},
+        {"role": "user", "content": "Who is Cori Stewart?"}
+    ],
+    "relevant_docs": [
+        Document("ARM Hub is a leading robotics research organization founded by Cori Stewart in 2020. The organization focuses on advancing the field of robotics through innovative research and development projects."),
+        Document("Cori Stewart is the founder and CEO of ARM Hub. With a background in robotics engineering and a passion for innovation, Stewart established ARM Hub to drive the future of robotics technology."),
+        Document("ARM Hub's team consists of experienced researchers and engineers from various disciplines. The organization collaborates with academic institutions and industry partners to push the boundaries of robotics research.")
+    ]
+}
+
+print(is_context_relevant_chain.invoke(test_input))
+
+# COMMAND ----------
+
+test_input = {
+    "messages": [
+        {"role": "user", "content": "What is the weather like today?"}
+    ],
+    "relevant_docs": [
+        Document("ARM Hub is a leading robotics research organization founded by Cori Stewart in 2020. The organization focuses on advancing the field of robotics through innovative research and development projects."),
+        Document("Cori Stewart is the founder and CEO of ARM Hub. With a background in robotics engineering and a passion for innovation, Stewart established ARM Hub to drive the future of robotics technology."),
+        Document("ARM Hub's team consists of experienced researchers and engineers from various disciplines. The organization collaborates with academic institutions and industry partners to push the boundaries of robotics research.")
+    ]
+}
+
+print(is_context_relevant_chain.invoke(test_input))
 
 # COMMAND ----------
 
@@ -344,51 +459,121 @@ question_with_history_and_context_prompt = PromptTemplate(
     template=question_with_history_and_context_str
 )
 
-def format_context(docs):
-    return "\n\n".join([d.page_content for d in docs])
-
-def extract_source_urls(docs):
-    return [d.metadata["basename"] for d in docs]
-
 # Process all questions through this chain
-answer_all_questions_chain = (
+relevant_question_chain = (
+  RunnablePassthrough() |
+  {
+    "relevant_docs": generate_query_to_retrieve_context_prompt | chat_model | StrOutputParser() | retriever,
+    "chat_history": itemgetter("chat_history"), 
+    "question": itemgetter("question")
+  }
+  |
+  {
+    "context": itemgetter("relevant_docs") | RunnableLambda(format_context),
+    "sources": itemgetter("relevant_docs") | RunnableLambda(extract_source_docs),
+    "chat_history": itemgetter("chat_history"), 
+    "question": itemgetter("question")
+  }
+  |
+  {
+    "prompt": question_with_history_and_context_prompt,
+    "sources": itemgetter("sources")
+  }
+  |
+  {
+    "result": itemgetter("prompt") | chat_model | StrOutputParser(),
+    "sources": itemgetter("sources")
+  }
+)
+
+base_knowledge_notice = "An answer to your question could not be found in the database. Referring to base knowledge."
+
+answer_with_base_knowledge_chain = (
     RunnablePassthrough() |
-        {
-            "relevant_docs": generate_query_to_retrieve_context_prompt | chat_model | StrOutputParser() | retriever,
-            "chat_history": itemgetter("chat_history"),
-            "question": itemgetter("question")
-        }
-    |
-        {
-            "context": itemgetter("relevant_docs") | RunnableLambda(format_context),
-            "sources": itemgetter("relevant_docs") | RunnableLambda(extract_source_urls),
-            "chat_history": itemgetter("chat_history"),
-            "question": itemgetter("question")
-        }
-    |
-        {
-            "prompt": question_with_history_and_context_prompt,
-            "sources": itemgetter("sources")
-        }
-    |
-        {
-            "result": itemgetter("prompt") | chat_model | StrOutputParser(),
-            "sources": itemgetter("sources")
-        }
-)
-
-# Full chain that always navigates to answer_all_questions_chain
-full_chain = (
     {
-        "question": itemgetter("messages") | RunnableLambda(extract_question),
-        "chat_history": itemgetter("messages") | RunnableLambda(extract_history),
+        "chat_history": itemgetter("chat_history"),
+        "question": itemgetter("question")
     }
-    | answer_all_questions_chain
+    |
+    {
+        "context": RunnableLambda(lambda x: ""),
+        "sources": RunnableLambda(lambda x: []),
+        "chat_history": itemgetter("chat_history"),
+        "question": itemgetter("question")
+    }
+    |
+    {
+        "prompt": question_with_history_and_context_prompt,
+        "sources": itemgetter("sources")
+    }
+    |
+    {
+        "result": itemgetter("prompt") | chat_model | StrOutputParser(),
+        "sources": itemgetter("sources")
+    }
+    |
+    RunnableLambda(lambda x: {
+        "result": "An answer to your question could not be found in the database. Referring to base knowledge.\n\n" + x["result"],
+        "sources": x["sources"]
+    })
 )
 
-# Example usage:
-result = full_chain.invoke({ "messages": [ {"role": "user", "content": "What is Apache Spark?"}, {"role": "assistant", "content": "Apache Spark is an open-source data processing engine that is widely used in big data analytics."}, {"role": "user", "content": "Who is Cori Stewart?"} ] })
-print(result)
+branch_node = RunnableBranch(
+    (lambda x: "yes" in x["question_is_relevant"].lower(), relevant_question_chain),
+    (lambda x: "no" in x["question_is_relevant"].lower(), answer_with_base_knowledge_chain),
+    answer_with_base_knowledge_chain
+)
+
+full_chain = (
+  {
+    "question_is_relevant": is_context_relevant_chain,
+    "question": itemgetter("messages") | RunnableLambda(extract_question),
+    "chat_history": itemgetter("messages") | RunnableLambda(extract_history)
+  }
+  | branch_node
+)
+
+# COMMAND ----------
+
+import json
+relevant_dialog = {
+    "messages": [
+        {"role": "user", "content": "Who founded ARM Hub?"},
+        {"role": "assistant", "content": "ARM Hub was founded by Cori Stewart."},
+        {"role": "user", "content": "Who is Cori Stewart?"}
+    ]
+}
+print(f'Testing with a relevant question...')
+response = full_chain.invoke(relevant_dialog)
+print(response)
+
+# COMMAND ----------
+
+import json
+relevant_dialog = {
+    "messages": [
+        {"role": "user", "content": "Who founded Google?"},
+        {"role": "assistant", "content": "Larry Page and Sergey Brin founded Google."},
+        {"role": "user", "content": "When was it founded?"}
+    ]
+}
+print(f'Testing with an  irrelevant question...')
+response = full_chain.invoke(relevant_dialog)
+print(response['result'])
+
+# COMMAND ----------
+
+import json
+relevant_dialog = {
+    "messages": [
+        {"role": "user", "content": "What is ARM Hub?"}, 
+        {"role": "assistant", "content": "ARM Hub is an independent, not-for-profit organization that aims to accelerate the adoption of advanced manufacturing technologies in Australia. It serves as an aggregator of research and development, connecting private industry, research institutions, and government to help uplift, upskill, and transform Australian manufacturing with a particular focus on small and medium-sized enterprises (SMEs). ARM Hub facilitates the creation and adoption of advanced manufacturing technologies and processes by providing expertise from researchers, engineers, and roboticists in priority technical areas such as automation and robotics, data science, image processing and computer vision, human-robot interaction, and process design. They also build expert teams to address the specific needs of business transformations and apply Industry 4.0 technologies to meet industry challenges."}, 
+        {"role": "user", "content": "How do I engage it?"}
+    ]
+}
+print(f'Testing with a relevant question...')
+response = full_chain.invoke(relevant_dialog)
+print(response)
 
 # COMMAND ----------
 

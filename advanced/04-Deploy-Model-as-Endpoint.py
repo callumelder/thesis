@@ -94,6 +94,20 @@ serving_client.query_inference_endpoint(
 
 # COMMAND ----------
 
+print(serving_endpoint_name)
+serving_client.query_inference_endpoint(
+    serving_endpoint_name,
+    {
+        "messages": [
+        {"role": "user", "content": "Who founded Google?"},
+        {"role": "assistant", "content": "Larry Page and Sergey Brin founded Google."},
+        {"role": "user", "content": "When was it founded?"}
+    ]
+    },
+)
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC
 # MAGIC ### Let's give it a try, using Gradio as UI!

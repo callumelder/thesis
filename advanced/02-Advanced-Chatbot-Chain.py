@@ -111,7 +111,7 @@ print(chain.invoke({"question": "Who founded google?"}))
 # COMMAND ----------
 
 prompt_with_history_str = """
-You are a ARM Hub's chatbot. Please answer ARM Hub Related questions only. If you don't know the answer or it is not related to ARM Hub, don't answer.
+You are ARM Hub's chatbot. Please answer ARM Hub Related questions only. If you don't know the answer or it is not related to ARM Hub, don't answer.
 
 Here is a history between you and a human: {chat_history}
 
@@ -428,9 +428,9 @@ You are ARM Hub's friendly chatbot. You answer questions, based on the companies
 Here are some examples of good answers:
 
 '''
-Who is the Chair of the ARM Hub Board and what role does he play in the development of the AIDCC program?
+Who is the Chair of ARM Hub's Board and what role does he play in the development of the AIDCC program?
 
-The Chair of the ARM Hub Board is Emeritus Professor Roy Green, Innovation Advisor at the University of Technology Sydney. Professor Green holds prestigious national and international appointments and is a key figure in Australia's industrial digital transformation agenda and innovation ecosystem. He has been instrumental in establishing policy arguments and evidence that inspired the development of the AIDCC program.
+The Chair of ARM Hub's Board is Emeritus Professor Roy Green, Innovation Advisor at the University of Technology Sydney. Professor Green holds prestigious national and international appointments and is a key figure in Australia's industrial digital transformation agenda and innovation ecosystem. He has been instrumental in establishing policy arguments and evidence that inspired the development of the AIDCC program.
 '''
 
 '''
@@ -454,9 +454,26 @@ Answer straight, do not repeat the question, do not start with something like: t
 Based on this history and context, answer this question: {question}
 """
 
+base_knowledge_history_and_context_str = """
+You are a friendly chatbot. You answer questions, based on the companies data, to the best of your ability. You are to answer the question in a professional manner. Use the discussion to understand the context of the question if relevant. You are to be respectful and conduct yourself to a high standard.
+
+Discussion: {chat_history}
+
+Here's some context which may be relevant to the question: {context}
+
+Answer straight, do not repeat the question, do not start with something like: the answer to the question, do not add "AI" in front of your answer, do not say: here is the answer, do not mention the context or the question.
+
+Based on this history and context, answer this question: {question}
+"""
+
 question_with_history_and_context_prompt = PromptTemplate(
     input_variables=["chat_history", "context", "question"],
     template=question_with_history_and_context_str
+)
+
+base_knowledge_history_and_context_prompt = PromptTemplate(
+    input_variables=["chat_history", "context", "question"],
+    template=base_knowledge_history_and_context_str
 )
 
 # Process all questions through this chain
@@ -503,7 +520,7 @@ answer_with_base_knowledge_chain = (
     }
     |
     {
-        "prompt": question_with_history_and_context_prompt,
+        "prompt": base_knowledge_history_and_context_prompt,
         "sources": itemgetter("sources")
     }
     |
@@ -513,7 +530,7 @@ answer_with_base_knowledge_chain = (
     }
     |
     RunnableLambda(lambda x: {
-        "result": "An answer to your question could not be found in the database. Referring to base knowledge.\n\n" + x["result"],
+        "result": "An answer to your question could not be found in the database. Referring to base knowledge.\n\n\n" + x["result"],
         "sources": x["sources"]
     })
 )
@@ -521,7 +538,7 @@ answer_with_base_knowledge_chain = (
 branch_node = RunnableBranch(
     (lambda x: "yes" in x["question_is_relevant"].lower(), relevant_question_chain),
     (lambda x: "no" in x["question_is_relevant"].lower(), answer_with_base_knowledge_chain),
-    answer_with_base_knowledge_chain
+    relevant_question_chain
 )
 
 full_chain = (
@@ -536,7 +553,7 @@ full_chain = (
 # COMMAND ----------
 
 import json
-relevant_dialog = {
+dialog = {
     "messages": [
         {"role": "user", "content": "Who founded ARM Hub?"},
         {"role": "assistant", "content": "ARM Hub was founded by Cori Stewart."},
@@ -544,22 +561,62 @@ relevant_dialog = {
     ]
 }
 print(f'Testing with a relevant question...')
-response = full_chain.invoke(relevant_dialog)
+response = full_chain.invoke(dialog)
 print(response)
 
 # COMMAND ----------
 
 import json
-relevant_dialog = {
+dialog = {
+    "messages": [
+        {"role": "user", "content": "What date is it today?"}
+    ]
+}
+print(f'Testing with a relevant question...')
+response = full_chain.invoke(dialog)
+print(response)
+
+# COMMAND ----------
+
+import json
+dialog = {
+    "messages": [
+        {"role": "user", "content": "Who is the Chair of the ARM Hub Board and what role does he play in the development of the AIDCC program?"},
+        {"role": "assistant", "content": "The Chair of the ARM Hub Board is Emeritus Professor Roy Green, Innovation Advisor at the University of Technology Sydney. Professor Green holds prestigious national and international appointments and is a key figure in Australia's industrial digital transformation agenda and innovation ecosystem. He has been instrumental in establishing policy arguments and evidence that inspired the development of the AIDCC program."},
+        {"role": "user", "content": "Do you know who Callum Elder is?"}
+    ]
+}
+print(f'Testing with a relevant question...')
+response = full_chain.invoke(dialog)
+print(response)
+
+# COMMAND ----------
+
+import json
+dialog = {
+    "messages": [
+        {"role": "user", "content": "What is the leakster project?"},
+        {"role": "assistant", "content": "The Leakster project is a venture by a Sunshine Coast-based start-up, Leakster Operations, focused on the research, development, and commercialisation of a water pipeline condition monitoring technology. This technology uses acoustic radar to non-invasively monitor underground water pipeline assets, providing valuable data on pipeline leaks, pipe material changes, valve status, blockages, and scaling. The project aims to help water utilities understand their pipeline infrastructure better and reduce water loss due to leaks and bursts. Currently, Leakster is contracted by Urban Utilities to deliver a prototype solution for leak detection over 1,000 kilometers of pipe. The long-term goal is to develop the product/service beyond leak detection to condition monitoring, including digital twin aspirations."},
+        {"role": "user", "content": "Do you know who Callum Elder is?"}
+    ]
+}
+print(f'Testing with a relevant question...')
+response = full_chain.invoke(dialog)
+print(response)
+
+# COMMAND ----------
+
+import json
+dialog = {
     "messages": [
         {"role": "user", "content": "Who founded Google?"},
         {"role": "assistant", "content": "Larry Page and Sergey Brin founded Google."},
         {"role": "user", "content": "When was it founded?"}
     ]
 }
-print(f'Testing with an  irrelevant question...')
-response = full_chain.invoke(relevant_dialog)
-print(response['result'])
+print(f'Testing with an irrelevant question...')
+response = full_chain.invoke(dialog)
+print(response)
 
 # COMMAND ----------
 

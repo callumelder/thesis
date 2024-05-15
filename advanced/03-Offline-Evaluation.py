@@ -561,6 +561,186 @@ plt.show()
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ##Plot in 3D
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ###Retrieval
+
+# COMMAND ----------
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+folder_path = "retrieval_evaluation/"
+
+datasets = ["1000_50_bge_evaluate_results.csv", "1000_50_ada_evaluate_results.csv", "1000_50_openai_large_evaluate_results.csv",
+            "500_25_bge_evaluate_results.csv", "500_25_ada_evaluate_results.csv", "500_25_openai_large_evaluate_results.csv",
+            "250_12_bge_evaluate_results.csv", "250_12_ada_evaluate_results.csv", "250_12_openai_large_evaluate_results.csv"]
+
+metrics = ["precision", "recall", "ndcg"]
+names = ["bge", "ada", "lge"]
+k_values = [1, 2, 3]
+chunking_sizes = ["1000", "500", "250"]
+
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # Define colors for each k value
+
+# Create a figure with subplots for each metric
+fig = plt.figure(figsize=(15, 5))
+
+for i, metric_name in enumerate(metrics):
+    ax = fig.add_subplot(1, len(metrics), i+1, projection='3d')
+
+    for j, k in enumerate(k_values):
+        for c, chunking_size in enumerate(chunking_sizes):
+            x = [j + dataset_index * (len(k_values) + 1) for dataset_index in range(len(names))]
+            y = [pd.read_csv(os.path.join(folder_path, dataset))[f"{metric_name}_at_{k}/score"].mean() for dataset in datasets if chunking_size in dataset]
+            z = [c] * len(x)
+            bars = ax.bar(x, y, zs=z, zdir='y', alpha=0.8, width=0.8, color=colors[j])
+
+            # Add bar values for last row
+            if c == 2:
+              for idx, bar in enumerate(bars):
+                  x_pos = x[idx]
+                  y_pos = y[idx]
+                  z_pos = z[idx]
+                  value = y[idx]
+                  ax.text(x_pos, z_pos, y_pos, f'{value:.2f}', ha='center', va='bottom', fontsize=6)
+
+    ax.set_xlabel("Embedding")
+    ax.set_ylabel("Chunking Size")
+    ax.set_zlabel(f"{metric_name.capitalize()} Value Mean")
+    ax.set_title(f"{metric_name.capitalize()}@k")
+    ax.set_xticks([i * (len(k_values) + 1) + (len(k_values) - 1) / 2 for i in range(len(names))])
+    ax.set_xticklabels(names)
+    ax.set_yticks(range(len(chunking_sizes)))
+    ax.set_yticklabels(chunking_sizes)
+    ax.set_zlim(0, 1)
+
+    # Add legend
+    handles = [plt.Rectangle((0, 0), 1, 1, color=colors[j]) for j in range(len(k_values))]
+    ax.legend(handles, [f"k={k}" for k in k_values], loc='upper right', bbox_to_anchor=(1.1, 1.1))
+
+# Add an overall title
+fig.suptitle("Evaluation Metrics for Different Chunking & Embedding Strategies", fontsize=16)
+
+# Save the plot to a file
+plt.savefig("evaluation_metrics_plot_chunking_sizes_3d.png")
+
+# Display the plot
+plt.show()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ###LLM Output
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ###Professionalism
+
+# COMMAND ----------
+
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+folder_path = "prompt_evaluation"
+prompts = ["base_prompt_metrics.csv", "specific_prompt_metrics.csv", "few_shot_prompt_metrics.csv"] 
+tickers = ["base", "specific", "few shot"] 
+
+bins = [1, 2, 3, 4, 5, 6]  # Add 6 as the upper limit of the last bin
+
+fig = plt.figure(figsize=(8, 6))
+ax = fig.add_subplot(111, projection='3d')
+
+for i, prompt_file in enumerate(prompts):
+    df_genai_metrics = pd.read_csv(os.path.join(folder_path, prompt_file))
+    
+    # Cut the professionalism scores into bins
+    professionalism_bins = pd.cut(df_genai_metrics['professionalism/v1/score'], bins=bins, right=False)
+    
+    # Count the occurrences of each bin
+    bin_counts = professionalism_bins.value_counts(sort=False)
+    
+    # Create x, y, and z coordinates for the bars
+    x = bin_counts.index.map(lambda x: int(x.left))
+    y = [i] * len(x)
+    z = bin_counts.values
+    
+    # Create 3D bars
+    bars = ax.bar3d(x, y, 0, 0.5, 0, z, alpha=0.5)
+    
+    # Add count labels above each bar
+    for j, (x_pos, y_pos, z_val) in enumerate(zip(x, y, z)):
+        ax.text(x_pos, y_pos, z_val, str(int(z_val)), ha='left', va='bottom')
+
+ax.set_xlabel('Professionalism Score')
+ax.set_ylabel('Prompt')
+ax.set_zlabel('Count')
+ax.set_title('Professionalism Score Distribution')
+ax.set_xticks(range(1, 6))  # Set the x-tick labels from 1 to 5
+ax.set_yticks(range(len(tickers)))
+ax.set_yticklabels(tickers)
+
+plt.savefig('professionalism_3d.png')
+plt.show()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ###Answer Correctness
+
+# COMMAND ----------
+
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+folder_path = "prompt_evaluation"
+prompts = ["base_prompt_metrics.csv", "specific_prompt_metrics.csv", "few_shot_prompt_metrics.csv"]
+tickers = ["base", "specific", "few shot"]
+
+fig = plt.figure(figsize=(8, 6))
+ax = fig.add_subplot(111, projection='3d')
+
+for i, prompt_file in enumerate(prompts):
+    df_genai_metrics = pd.read_csv(os.path.join(folder_path, prompt_file))
+    
+    # Count the occurrences of each answer correctness score
+    score_counts = df_genai_metrics['answer_correctness/v1/score'].value_counts()
+    
+    # Create x, y, and z coordinates for the bars
+    x = score_counts.index
+    y = [i] * len(x)
+    z = score_counts.values
+    
+    # Create 3D bars
+    bars = ax.bar3d(x, y, 0, 0.5, 0, z, alpha=0.4)
+    
+    # Add count labels above each bar
+    for j, (x_pos, y_pos, z_val) in enumerate(zip(x, y, z)):
+        ax.text(x_pos, y_pos, z_val, str(int(z_val)), ha='left', va='bottom')
+
+ax.set_xlabel('Answer Correctness Score')
+ax.set_ylabel('Prompt')
+ax.set_zlabel('Count')
+ax.set_title('Answer Correctness Score Distribution')
+ax.set_xticks(score_counts.index)  # Set the x-tick labels to the score values
+ax.set_yticks(range(len(tickers)))
+ax.set_yticklabels(tickers)
+
+plt.savefig('answer_correctness_3d.png')
+plt.show()
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## This is looking good, let's tag our model as production ready
 # MAGIC
 # MAGIC After reviewing the model correctness and potentially comparing its behavior to your other previous version, we can flag our model as ready to be deployed.
